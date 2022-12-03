@@ -1,5 +1,12 @@
-pub mod day1;
 pub mod year2022;
+
+pub fn init() -> AdventManager {
+    let mut years = vec![];
+
+    years.push(year2022::init());
+
+    AdventManager::new(2022, years)
+}
 
 pub trait AdventYear {
     fn year(&self) -> usize;
@@ -84,10 +91,4 @@ impl AdventManager {
     }
 }
 
-pub fn init() -> AdventManager {
-    let mut years = vec![];
 
-    years.push(year2022::init());
-
-    AdventManager::new(2022, years)
-}
