@@ -1,5 +1,13 @@
 use std::fs::File;
 use std::io::{ self, BufRead };
+use crate::{ AdventYear, Year };
+
+pub fn init() -> Box<dyn AdventYear> {
+    Box::new(Year {
+        year: 2022,
+        days: vec![Box::new(day1)],
+    })
+}
 
 pub fn day1() {
     let mut total_calories: Vec<usize> = vec![];
@@ -40,3 +48,5 @@ pub fn day1() {
     println!("Top 3 Calories: {}", top3_calories);
 
 }
+
+
