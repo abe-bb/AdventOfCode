@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::{ self, BufRead };
 
-pub fn solve() {
+pub fn day1() {
     let mut total_calories: Vec<usize> = vec![];
 
     let lines_iter = io::BufReader::new(
