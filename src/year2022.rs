@@ -17,7 +17,7 @@ pub fn init() -> Box<dyn AdventYear> {
 fn day2() {
     let reader = BufReader::new(File::open("./inputs/2022/day2/input").expect("unable to read input file for 2022 day2"));
     
-    let rounds: Vec<RPSRound> = reader.lines()
+    let rounds: Vec<(RPSRound, RPSRound)> = reader.lines()
         .map(|round| {
             let line = round.expect("unable to read line");
             let mut char_iter = line.chars();
@@ -33,24 +33,61 @@ fn day2() {
             // skip whitespace character
             char_iter.next().unwrap();
 
-            // parse my move
-            let me = match char_iter.next().unwrap() {
+            // parse my move for question 1
+            let my_char = char_iter.next().unwrap();
+            let me_part1 = match my_char {
                 'X' => RPS::Rock,
                 'Y' => RPS::Paper,
                 'Z' => RPS::Scissors,
                 _ => panic!("unexpected third symbol"),
             };
 
-            RPSRound::new(opponent, me)
+
+            // parse my move for question 2
+            let me_part2 =  match opponent {
+                RPS::Rock => {
+                    match my_char {
+                        'X' => RPS::Scissors,
+                        'Y' => RPS::Rock,
+                        'Z' => RPS::Paper,
+                        _ => panic!("unexpected third symbol"),
+                    }
+                },
+                RPS::Paper => {
+                    match my_char {
+                        'X' => RPS::Rock,
+                        'Y' => RPS::Paper,
+                        'Z' => RPS::Scissors,
+                        _ => panic!("unexpected third symbol"),
+                    }
+                },
+                RPS::Scissors => {
+                    match my_char {
+                        'X' => RPS::Paper,
+                        'Y' => RPS::Scissors,
+                        'Z' => RPS::Rock,
+                        _ => panic!("unexpected third symbol"),
+                    } 
+                }
+            };
+
+            // return a tuple formatted (part 1 round, part 2 round)
+            (RPSRound::new(opponent, me_part1), RPSRound::new(opponent, me_part2))
         })
         .collect();
 
-        let my_total: i32 = rounds.iter()
-            .map(|round| round.score().1)
-            .sum();
+    let (mut total_part1, mut total_part2) = (0, 0);
 
-        println!("My total: {}", my_total);
+    // sum up rounds for parts 1 and 2
+    for round in rounds {
+        total_part1 += round.0.score().1;
+        total_part2 += round.1.score().1;
+    }
+
+    println!("Part 1 total score: {}", total_part1);
+    println!("Part 2 total score: {}", total_part2);
 }
+
 
 #[derive(Copy, Clone)]
 enum RPS {
