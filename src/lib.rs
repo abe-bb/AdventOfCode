@@ -14,7 +14,7 @@ pub trait AdventYear {
     fn solve_latest(&self);
 }
 
-pub struct Year {
+struct Year {
     year: usize,
     days: Vec<Box<dyn Fn()>>,
 }
