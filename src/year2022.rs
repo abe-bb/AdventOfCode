@@ -5,13 +5,70 @@ use crate::{ AdventYear, Year };
 
 pub fn init() -> Box<dyn AdventYear> {
     let days: Vec<Box<dyn Fn()>> = vec![
-        Box::new(day1), Box::new(day2), Box::new(day3)
+        Box::new(day1), Box::new(day2), Box::new(day3), Box::new(day4)
     ];
 
     Box::new(Year {
         year: 2022,
         days,
     })
+}
+
+fn day4() {
+    let reader = BufReader::new(File::open("./inputs/2022/day4/input").expect("can't read 2022 day3 input"));
+    let elf_pairs: Vec<ElfPair> = reader.lines()
+        .map(|pair| {
+            let line = pair.expect("can't read 2022 day 4 input");
+            let elf_ranges: Vec<&str> = line
+                .split(',')
+                .collect();
+            assert!(elf_ranges.len() == 2, "unexpected input format");
+
+            let mut elf_pair: Vec<Vec<usize>> = elf_ranges.iter()
+                .map(|elf_range| { 
+                    let range: Vec<usize> = elf_range.split('-')
+                        .map(|range_end| { range_end.parse::<usize>().expect("unable to parse int from range") })
+                        .collect();
+                    range
+                })
+                .collect();
+
+            assert!(elf_pair.len() == 2, "invalid number of elves parsed from an elf pair");
+            let elf2 = elf_pair.pop().unwrap();
+            let elf1 = elf_pair.pop().unwrap();
+            ElfPair::new(elf1, elf2)
+        })
+        .collect();
+
+    let num_overlapping = elf_pairs.iter()
+        .filter(|pair| pair.overlapping())
+        .count();
+
+    println!("Fully overlapping assignment pairs: {}", num_overlapping);
+}
+
+#[derive(Debug)]
+struct ElfPair {
+    elf1: Vec<usize>,
+    elf2: Vec<usize>,
+}
+
+impl ElfPair {
+    fn new(elf1: Vec<usize>, elf2: Vec<usize>) -> ElfPair {
+        assert!(elf1.len() == 2, "invalid range assigned to elf, likely parsing error");
+        assert!(elf2.len() == 2, "invalid range assigned to elf, likely parsing error");
+
+        ElfPair {
+            elf1,
+            elf2,
+        }
+    }
+
+    // determine whether one range contains the other (bidirectional)
+    fn overlapping(&self) -> bool {
+        (self.elf1[0] <= self.elf2[0] && self.elf1[1] >= self.elf2[1]) ||
+            (self.elf2[0] <= self.elf1[0] && self.elf2[1] >= self.elf1[1])
+    }
 }
 
 fn day3() {
