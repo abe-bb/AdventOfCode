@@ -5,13 +5,148 @@ use crate::{ AdventYear, Year };
 
 pub fn init() -> Box<dyn AdventYear> {
     let days: Vec<Box<dyn Fn()>> = vec![
-        Box::new(day1), Box::new(day2), Box::new(day3), Box::new(day4)
+        Box::new(day1), Box::new(day2), Box::new(day3), Box::new(day4), Box::new(day5)
     ];
 
     Box::new(Year {
         year: 2022,
         days,
     })
+}
+
+fn day5() {
+    let mut ship1 = parse_day5();
+    let mut ship2 = ship1.clone();
+
+    ship1.execute_part1_movements();
+    ship2.execute_part2_movements();
+
+    let top1 = ship1.read_top();
+    let top2 = ship2.read_top();
+
+    println!("Part 1 top of stacks: {}", top1);
+    println!("Part 2 top of stacks: {}", top2);
+}
+
+fn parse_day5() -> Ship {
+    let reader = BufReader::new(File::open("./inputs/2022/day5/input").expect("can't read input file"));
+    let lines_iter = reader.lines();
+
+    let mut cargo_hold: Vec<Vec<char>> = vec![];
+    let mut movements: Vec<Movement> = vec![];
+    
+    for text_line in lines_iter {
+        let line = text_line.unwrap();
+        // skip the empty line
+        if line.is_empty() || line.trim().starts_with('1') {
+            continue;
+        }
+        // parse cargo lines
+        else if (line.starts_with('[') || line.starts_with(' ')) && !line.chars().nth(1).unwrap().is_numeric() {
+            // initialize cargo held stacks if needed
+            if cargo_hold.is_empty() {
+                let cargo_width = (line.len() + 1) / 4;
+                for _ in 0..cargo_width {
+                    cargo_hold.push(vec![]);
+                }
+            }
+
+            parse_cargo_line(&mut cargo_hold, &line);
+
+        }
+        // parse the move instructions
+        else if line.starts_with('m') {
+            let line_components: Vec<&str> = line.split(' ')
+                .collect();
+            movements.push( Movement {
+                num: line_components[1].parse::<usize>().unwrap(),
+                from: line_components[3].parse::<usize>().unwrap(),
+                to: line_components[5].parse::<usize>().unwrap(),
+            });
+        }
+        else {
+            panic!("unexpected input: {}", line);
+        }
+    }
+
+    for stack in cargo_hold.iter_mut() {
+        stack.reverse();
+    }
+
+    
+
+    Ship {
+        hold: cargo_hold,
+        movements,
+    }
+}
+
+fn parse_cargo_line(cargo_hold: &mut Vec<Vec<char>>, line: &str) {
+
+    let mut chars = line.chars();
+    for i in 0..line.len() {
+        let current_crate = chars.next().unwrap();
+        if i == 1 || (i >= 4 && ((i - 1) % 4) == 0) {
+            if current_crate.is_alphabetic() {
+                let index = i / 4;
+                cargo_hold[index].push(current_crate);
+            }
+        }
+    }
+
+
+}
+
+#[derive(Clone)]
+struct Ship {
+    hold: Vec<Vec<char>>,
+    movements: Vec<Movement>,
+}
+
+impl Ship {
+    pub fn execute_part1_movements(&mut self) {
+        for movement in self.movements.iter() {
+            let from = movement.from - 1;
+            let to = movement.to - 1;
+            for _ in 0..movement.num {
+                let current_crate = self.hold[from].pop().unwrap();
+                self.hold[to].push(current_crate);
+            }
+
+        }
+    }
+
+    pub fn execute_part2_movements(&mut self) {
+        for movement in self.movements.iter() {
+            let from = movement.from - 1;
+            let to = movement.to - 1;
+
+            let mut small_stack: Vec<char> = vec![];
+            for _ in 0..movement.num {
+                let current_crate = self.hold[from].pop().unwrap();
+                small_stack.push(current_crate);
+            }
+
+            for current_crate in small_stack.into_iter().rev() {
+                self.hold[to].push(current_crate);
+            }
+        }
+    }
+
+    pub fn read_top(&self) -> String {
+        self.hold.iter()
+            .map(|item| item.last())
+            .filter(|item| item.is_some())
+            .map(|item| item.unwrap())
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Movement {
+    pub num: usize,
+    pub from: usize,
+    pub to: usize,
 }
 
 fn day4() {
