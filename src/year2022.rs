@@ -40,11 +40,16 @@ fn day4() {
         })
         .collect();
 
+    let num_fully_overlapping = elf_pairs.iter()
+        .filter(|pair| pair.completely_overlapping())
+        .count();
+
     let num_overlapping = elf_pairs.iter()
         .filter(|pair| pair.overlapping())
         .count();
 
-    println!("Fully overlapping assignment pairs: {}", num_overlapping);
+    println!("Fully overlapping assignment pairs: {}", num_fully_overlapping);
+    println!("Overlapping pairs: {}", num_overlapping);
 }
 
 #[derive(Debug)]
@@ -64,10 +69,19 @@ impl ElfPair {
         }
     }
 
-    // determine whether one range contains the other (bidirectional)
-    fn overlapping(&self) -> bool {
+    // determine whether either range contains the other
+    fn completely_overlapping(&self) -> bool {
         (self.elf1[0] <= self.elf2[0] && self.elf1[1] >= self.elf2[1]) ||
             (self.elf2[0] <= self.elf1[0] && self.elf2[1] >= self.elf1[1])
+    }
+
+    // determines whether either range overlaps at all
+    fn overlapping(&self) -> bool {
+        (self.elf1[0] >= self.elf2[0] && self.elf1[0] <= self.elf2[1]) || 
+            (self.elf1[1] >= self.elf2[0] && self.elf1[1] <= self.elf2[1]) ||
+            (self.elf2[0] >= self.elf1[0] && self.elf2[0] <= self.elf1[1]) ||
+            (self.elf2[1] >= self.elf1[0] && self.elf2[1] <= self.elf1[1])
+
     }
 }
 
