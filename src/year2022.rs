@@ -1,17 +1,56 @@
-use std::fs::File;
+use std::fs::{ self, File };
 use std::io::{ self, BufRead, BufReader };
 use std::collections::HashSet;
 use crate::{ AdventYear, Year };
 
 pub fn init() -> Box<dyn AdventYear> {
     let days: Vec<Box<dyn Fn()>> = vec![
-        Box::new(day1), Box::new(day2), Box::new(day3), Box::new(day4), Box::new(day5)
+        Box::new(day1), Box::new(day2), Box::new(day3), Box::new(day4), Box::new(day5),
+        Box::new(day6),
     ];
 
     Box::new(Year {
         year: 2022,
         days,
     })
+}
+
+fn day6() {
+    let input = fs::read_to_string("./inputs/2022/day6/input").unwrap();
+
+    let packet_marker = find_marker(&input, 4).unwrap();
+    let message_marker = find_marker(&input, 14).unwrap();
+
+    println!("Packet marker: {}", packet_marker);
+    println!("Message marker: {}", message_marker);
+}
+
+fn find_marker(input: &str, marker_length: usize) -> Option<usize> {
+    assert!(input.is_ascii());
+    assert!(input.len() >= marker_length);
+
+
+    let ascii = input.as_bytes().to_vec();
+
+    let slice_length = marker_length;
+    for i in 0..(ascii.len() - slice_length) {
+        if is_slice_unique(&ascii[i..(i+slice_length)]) {
+            return Some(i + slice_length);
+        }
+    }
+    None
+
+}
+
+fn is_slice_unique(slice: &[u8]) -> bool {
+    for (i, _) in slice.iter().enumerate() {
+        for j in (i + 1)..slice.len() {
+            if slice[i] == slice[j] {
+                return false;
+            }
+        }
+    }
+     true
 }
 
 fn day5() {
