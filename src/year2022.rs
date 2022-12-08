@@ -6,13 +6,189 @@ use crate::{ AdventYear, Year };
 pub fn init() -> Box<dyn AdventYear> {
     let days: Vec<Box<dyn Fn()>> = vec![
         Box::new(day1), Box::new(day2), Box::new(day3), Box::new(day4), Box::new(day5),
-        Box::new(day6),
+        Box::new(day6), Box::new(day7),
     ];
 
     Box::new(Year {
         year: 2022,
         days,
     })
+}
+
+fn day7() {
+    let mut root = parse_day7();
+
+    let required_space = 30000000;
+    let disk_space = 70000000;
+    let current_free = disk_space - root.size();
+
+    println!("Current free: {}", current_free);
+
+    println!("Part 1 Sum: {}", root.sum_dirs_part_1(100_000));
+    println!("Size of best delete option: {}", root.find_optimal_dir_part_2(required_space, current_free, disk_space));
+
+}
+
+fn parse_day7() -> ElfDir {
+    let mut root = ElfDir::new("/".to_string());
+
+    let reader = BufReader::new(File::open("./inputs/2022/day7/input").expect("can't open input file"));
+
+    let mut path: Vec<String> = vec![];
+
+    for line_opt in reader.lines() {
+        
+        let line = line_opt.unwrap();
+        let symbols: Vec<&str> = line.split(' ').collect();
+
+        match symbols[0] {
+            // line contains a command
+            "$" => {
+                match symbols[1] {
+                    "cd" => match symbols[2] {
+                        // return to the root directory
+                        "/" => { path.clear(); },
+                        ".." => { path.pop(); },
+                        dir => { path.push(dir.to_string()); },
+                    },
+                    "ls" => (),
+                    _ => panic!("unexpected command"),
+                }
+            },
+            // line contains a new directory
+            "dir" => { 
+                let directory = FSType::Dir(Box::new(ElfDir::new(symbols[1].to_string())));
+                root.add_fs_item(directory, &path, 0);
+            },
+            // line containts a file
+            file_size => {
+                let size = file_size.parse::<usize>().expect("couldn't parse file size from input");
+                let name = symbols[1].to_string();
+                let file = FSType::File(ElfFile::new(size, name));
+                root.add_fs_item(file, &path, 0);
+            }
+        }
+
+    }
+    root
+}
+
+enum FSType {
+    Dir(Box<ElfDir>),
+    File(ElfFile),
+}
+
+impl FSType {
+    pub fn size(&mut self) -> usize {
+        match self {
+            FSType::Dir(item) => item.size(),
+            FSType::File(item) => item.size,
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        match self {
+            FSType::Dir(item) => &item.name,
+            FSType::File(item) => &item.name,
+        }
+    }
+
+}
+
+struct ElfFile {
+    size: usize,
+    name: String,
+}
+
+impl ElfFile {
+    pub fn new(size: usize, name: String) -> ElfFile {
+        ElfFile {
+            size,
+            name,
+        }
+    }
+}
+
+struct ElfDir {
+    size: Option<usize>,
+    name: String,
+    contents: Vec<FSType>,
+}
+
+impl ElfDir {
+    pub fn new(name: String) -> ElfDir {
+        ElfDir {
+            size: None,
+            name,
+            contents: vec![],
+        }
+    }
+
+    pub fn add_fs_item(&mut self, fs_item: FSType, path: &Vec<String>, index: usize) {
+        if index == path.len() {
+            self.contents.push(fs_item);
+        }
+        else {
+            if let Some(FSType::Dir(dir)) = self.get_child_item(&path[index]) {
+                dir.add_fs_item(fs_item, path, index + 1);
+            }
+            else {
+                panic!("unkown directory {}", path[index]);
+            }
+        }
+    }
+
+    pub fn get_child_item(&mut self, name: &str) -> Option<&mut FSType> {
+        for item in self.contents.iter_mut() {
+            if item.name() == name {
+                return Some(item);
+            }
+        }
+        None
+    }
+
+    pub fn sum_dirs_part_1(&mut self, max_size: usize) -> usize {
+        let mut total: usize = 0;
+
+        if self.size() <= max_size {
+            total += self.size();
+        }
+        for item in self.contents.iter_mut() {
+            if let FSType::Dir(dir) = item {
+                total += dir.sum_dirs_part_1(max_size);
+            }
+        }
+        total
+    }
+
+    pub fn find_optimal_dir_part_2(&mut self, required_space: usize, current_free: usize, current_best: usize) -> usize {
+        let remove_self = self.size() + current_free;
+
+        let mut best_option = current_best;
+        
+        if remove_self >= required_space && self.size() < current_best {
+            best_option = self.size();
+        }
+
+        for item in self.contents.iter_mut() {
+            if let FSType::Dir(dir) = item {
+                best_option = dir.find_optimal_dir_part_2(required_space, current_free, best_option);
+            }
+        }
+
+        best_option
+    }
+
+    pub fn size(&mut self) -> usize {
+        match self.size {
+            Some(size) => size,
+            None => {
+                let size = self.contents.iter_mut().map(|fs_item| fs_item.size()).sum();
+                self.size = Some(size);
+                size
+            },
+        }
+    }
 }
 
 fn day6() {
