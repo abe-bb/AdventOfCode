@@ -6,13 +6,195 @@ use crate::{ AdventYear, Year };
 pub fn init() -> Box<dyn AdventYear> {
     let days: Vec<Box<dyn Fn()>> = vec![
         Box::new(day1), Box::new(day2), Box::new(day3), Box::new(day4), Box::new(day5),
-        Box::new(day6), Box::new(day7),
+        Box::new(day6), Box::new(day7), Box::new(day8),
     ];
 
     Box::new(Year {
         year: 2022,
         days,
     })
+}
+
+fn day8() {
+    let trees = parse_day8();
+
+    println!("Number of visible trees: {}", trees.count_visible());
+    println!("Max scene score: {}", trees.highest_scene_score());
+}
+
+fn parse_day8() -> Trees {
+    let mut trees = Trees { trees: vec![] };
+
+    let reader = BufReader::new(File::open("./inputs/2022/day8/input").expect("can't open input file"));
+    for line_opt in reader.lines() {
+        let line = line_opt.unwrap();
+
+        let tree_row: Vec<u8> = line
+            .chars()
+            .map(|character| character.to_digit(10).unwrap() as u8 )
+            .collect();
+
+        trees.push(tree_row);
+    }
+
+    trees
+
+}
+
+struct Trees {
+    trees: Vec<Vec<u8>>,
+}
+
+impl Trees {
+    pub fn push(&mut self, tree_row: Vec<u8>) {
+        if self.trees.len() == 0 {
+            self.trees.push(tree_row);
+        }
+        else {
+            assert!(self.trees.last().unwrap().len() == tree_row.len(), "new row does not match length of existing rows");
+            self.trees.push(tree_row);
+        }
+    }
+
+    pub fn highest_scene_score(&self) -> usize {
+        let mut max_score = 0;
+        if self.trees.len() <= 2 || self.trees.last().unwrap().len() <= 2 {
+            max_score
+        }
+        else {
+            for row in 1..(self.trees.len() - 1) {
+                for column in 1..(self.trees.last().unwrap().len() - 1) {
+                    let scene_score = self.scene_score(row, column);
+                    if scene_score > max_score {
+                        max_score = scene_score;
+                    }
+                }
+            }
+
+            max_score
+        }
+    }
+
+    fn scene_score(&self, row: usize, col: usize) -> usize {
+        let mut visible_left: usize = 0;
+        let mut visible_right: usize = 0;
+        let mut visible_up: usize = 0;
+        let mut visible_down: usize = 0;
+
+        let tree = self.trees[row][col];
+
+        // calculate visible trees to the left
+        for j in (0..col).rev() {
+            if self.trees[row][j] < tree {
+                visible_left += 1;
+            }
+            else {
+                visible_left += 1;
+                break;
+            }
+        }
+
+        // calculate visible trees to the right
+        for j in (col + 1)..(self.trees.last().unwrap().len()) {
+            if self.trees[row][j] < tree {
+                visible_right += 1;
+            }
+            else {
+                visible_right += 1;
+                break;
+            }
+        }
+
+        // calculate visible trees up
+        for i in (0..row).rev() {
+            if self.trees[i][col] < tree {
+                visible_up += 1;
+            }
+            else {
+                visible_up += 1;
+                break;
+            }
+        }
+
+        // calculate visible trees down
+        for i in (row + 1)..(self.trees.len()) {
+             if self.trees[i][col] < tree {
+                visible_down += 1;
+            }
+            else {
+                visible_down += 1;
+                break;
+            }
+        }
+
+        // calculate scene score
+        visible_left * visible_right * visible_up * visible_down 
+    }
+
+    pub fn count_visible(&self) -> usize {
+        let mut num_visible: usize = 0;
+        if self.trees.len() == 0 {
+            num_visible
+        }
+        else if self.trees.len() <= 2 || self.trees.last().unwrap().len() <= 2 {
+            self.trees.len() * self.trees.last().unwrap().len()
+        }
+        else {
+            for row in 1..(self.trees.len() - 1) {
+                for column in 1..(self.trees.last().unwrap().len() - 1) {
+                    if self.is_visible(row, column) {
+                        num_visible += 1;
+                    }
+                }
+            }
+
+            num_visible + (2 * self.trees.len()) + (2 * (self.trees.last().unwrap().len() - 2))
+        }
+    }
+
+    fn is_visible(&self, row: usize, col: usize) -> bool {
+        let num = self.trees[row][col];
+
+        let mut blocked = false;
+
+        for j in 0..self.trees.last().unwrap().len() {
+            // check if visible from the left
+            if j == col {
+                if !blocked {
+                    return true;
+                }
+                blocked = false;
+            }
+            else if self.trees[row][j] >= num {
+                blocked = true
+            }
+        }
+        // check if visible from the right
+        if !blocked {
+            return true;
+        }
+        blocked = false;
+
+        for i in 0..self.trees.len() {
+            // check if visible from the top
+            if i == row {
+                if !blocked {
+                    return true;
+                }
+                blocked = false;
+            }
+            else if self.trees[i][col] >= num {
+                blocked = true;
+            }
+        }
+        // check if visible from the bottom
+        if !blocked {
+            return true;
+        }
+
+        // blocked on all sides
+        false
+    }
 }
 
 fn day7() {
