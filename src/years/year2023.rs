@@ -1,14 +1,246 @@
 use std::{
+    collections::HashMap,
     fs::File,
     io::{BufRead, BufReader},
+    iter,
 };
 
 use crate::{AdventYear, Year};
 
 pub fn init() -> Box<dyn AdventYear> {
-    let days: Vec<Box<dyn Fn()>> = vec![Box::new(day1), Box::new(day2)];
+    let days: Vec<Box<dyn Fn()>> = vec![Box::new(day1), Box::new(day2), Box::new(day3)];
 
     Box::new(Year { year: 2023, days })
+}
+
+fn day3() {
+    let reader = BufReader::new(File::open("./input/2023/day3").unwrap());
+    let result = day3p2_logic(reader);
+    println!("{}", result);
+}
+
+fn day3p2_logic(reader: impl BufRead) -> u64 {
+    // figure out line length
+    let mut reader_iter = reader.lines().peekable();
+    let line_length = reader_iter.peek().unwrap().as_ref().unwrap().len();
+    let reader_iter = reader_iter.map(|x| x.unwrap());
+
+    // set up dummy lines to be referenced at the beginning and end of iteration
+    let prev_line: String = iter::repeat('.').take(line_length).collect();
+    let last_line = vec![prev_line.clone()];
+
+    let mut reader_iter = reader_iter.chain(last_line.into_iter());
+    let current_line = reader_iter.next().unwrap();
+
+    let mut gear_ratios: Vec<HashMap<usize, (u64, u32)>> = Vec::new();
+    gear_ratios.push(HashMap::new());
+
+    let mut prev: Vec<char> = prev_line.chars().collect();
+    let mut current: Vec<char> = current_line.chars().collect();
+
+    let mut line_num = 0;
+
+    for next_line in reader_iter {
+        let mut next: Vec<char> = next_line.chars().collect();
+
+        gear_ratios.push(HashMap::new());
+        // figure out which numbers to are to be included
+        day3p2_find_adjascent_parts(
+            &mut prev,
+            &mut current,
+            &mut next,
+            &mut gear_ratios,
+            line_num,
+        );
+
+        prev = current;
+        current = next;
+        line_num += 1;
+    }
+
+    gear_ratios
+        .into_iter()
+        .map(|hashmap| {
+            let mut sum = 0;
+            for (_key, (value, count)) in hashmap {
+                if count == 2 {
+                    sum += value;
+                }
+            }
+
+            sum
+        })
+        .sum()
+}
+
+fn day3p2_find_adjascent_parts(
+    prev: &mut [char],
+    current: &mut [char],
+    next: &mut [char],
+    gears: &mut Vec<HashMap<usize, (u64, u32)>>,
+    line_num: usize,
+) {
+    let mut digits: Vec<char> = Vec::new();
+
+    for i in 0..current.len() {
+        if current[i].is_ascii_digit() {
+            digits.push(current[i]);
+        // found end of number
+        } else if !digits.is_empty() {
+            let value: String = digits.iter().collect();
+            let value: u64 = value.parse().unwrap();
+
+            day3p2_check_symbol_range(
+                i - digits.len(),
+                i,
+                [prev, current, next],
+                gears,
+                value,
+                line_num,
+            );
+
+            digits.clear();
+        }
+
+        // found end of line
+        if i == current.len() - 1 && !digits.is_empty() {
+            let value: String = digits.iter().collect();
+            let value: u64 = value.parse().unwrap();
+
+            day3p2_check_symbol_range(
+                i - digits.len() + 1,
+                i,
+                [prev, current, next],
+                gears,
+                value,
+                line_num,
+            );
+
+            digits.clear();
+        }
+    }
+}
+
+fn day3p2_check_symbol_range(
+    from: usize,
+    mut to: usize,
+    lines: [&mut [char]; 3],
+    gears: &mut Vec<HashMap<usize, (u64, u32)>>,
+    value: u64,
+    line_num: usize,
+) {
+    // extend from and to by 1 if not at bounds
+    let from = if from > 0 { from - 1 } else { from };
+    to += 1;
+
+    for offset in 0..lines.len() {
+        for i in from..to {
+            if lines[offset][i] == '*' {
+                gears[line_num + offset - 1]
+                    .entry(i)
+                    .and_modify(|(val, count)| {
+                        *val *= value;
+                        *count += 1;
+                    })
+                    .or_insert((value, 1));
+            }
+        }
+    }
+}
+fn _day3p1_logic(reader: impl BufRead) -> u64 {
+    // figure out line length
+    let mut reader_iter = reader.lines().peekable();
+    let line_length = reader_iter.peek().unwrap().as_ref().unwrap().len();
+    let reader_iter = reader_iter.map(|x| x.unwrap());
+
+    // set up dummy lines to be referenced at the beginning and end of iteration
+    let prev_line: String = iter::repeat('.').take(line_length).collect();
+    let last_line = vec![prev_line.clone()];
+
+    let mut reader_iter = reader_iter.chain(last_line.into_iter());
+    let current_line = reader_iter.next().unwrap();
+
+    let mut engine_parts: Vec<u64> = Vec::new();
+
+    let mut prev: Vec<char> = prev_line.chars().collect();
+    let mut current: Vec<char> = current_line.chars().collect();
+
+    for next_line in reader_iter {
+        let mut next: Vec<char> = next_line.chars().collect();
+
+        // figure out which numbers to are to be included
+        _day3_find_adjascent_parts(&mut prev, &mut current, &mut next, &mut engine_parts);
+
+        prev = current;
+        current = next;
+    }
+
+    engine_parts.into_iter().sum()
+}
+
+fn _day3_find_adjascent_parts(
+    prev: &mut [char],
+    current: &mut [char],
+    next: &mut [char],
+    parts: &mut Vec<u64>,
+) {
+    let mut digits: Vec<char> = Vec::new();
+
+    for i in 0..current.len() {
+        if current[i].is_ascii_digit() {
+            digits.push(current[i]);
+        // found end of number
+        } else if !digits.is_empty() {
+            if _day3_check_symbol_range(i - digits.len(), i, [prev, current, next]) {
+                let parts_num: String = digits.iter().collect();
+                let parts_num: u64 = parts_num.parse().unwrap();
+
+                parts.push(parts_num);
+                print!("\x1b[93m{}\x1b[0m", parts_num);
+            } else {
+                let str: String = digits.iter().collect();
+                print!("{}", str);
+            }
+
+            digits.clear();
+        }
+
+        if !current[i].is_ascii_digit() {
+            print!("{}", current[i])
+        }
+
+        // found end if line
+        if i == current.len() - 1 && !digits.is_empty() {
+            if _day3_check_symbol_range(i - digits.len() + 1, i, [prev, current, next]) {
+                let parts_num: String = digits.iter().collect();
+                let parts_num: u64 = parts_num.parse().unwrap();
+
+                parts.push(parts_num);
+                print!("\x1b[93m{}\x1b[0m", parts_num);
+            } else {
+                let str: String = digits.iter().collect();
+                print!("{}", str);
+            }
+            digits.clear();
+        }
+    }
+
+    print!("\n");
+}
+
+fn _day3_check_symbol_range(from: usize, mut to: usize, lines: [&mut [char]; 3]) -> bool {
+    // extend from and to by 1 if not at bounds
+    let from = if from > 0 { from - 1 } else { from };
+    to += 1;
+
+    for arr in lines {
+        for i in from..to {
+            if !(arr[i].is_ascii_digit()) && !(arr[i] == '.') {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 fn day2() {
@@ -193,7 +425,9 @@ fn recover_calibration_value(line: String) -> u64 {
 
 #[cfg(test)]
 mod test {
-    use crate::years::year2023::{_day2p1_logic, day1_logic, day2p2_logic};
+    use crate::years::year2023::{
+        _day2p1_logic, _day3p1_logic, day1_logic, day2p2_logic, day3p2_logic,
+    };
 
     #[test]
     fn day2p2_case1() {
@@ -228,5 +462,37 @@ zoneight234
 7pqrstsixteen";
 
         assert_eq!(281, day1_logic(input.as_bytes()));
+    }
+
+    #[test]
+    fn day3p1_case1() {
+        let input = "467..114..
+...*......
+..35..633.
+......#...
+617*......
+.....+.58.
+..592.....
+......755.
+...$.*....
+.664.598..";
+
+        assert_eq!(4361, _day3p1_logic(input.as_bytes()));
+    }
+
+    #[test]
+    fn day3p2_case1() {
+        let input = "467..114..
+...*......
+..35..633.
+......#...
+617*......
+.....+.58.
+..592.....
+......755.
+...$.*....
+.664.598..";
+
+        assert_eq!(467835, day3p2_logic(input.as_bytes()));
     }
 }
