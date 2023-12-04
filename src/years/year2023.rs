@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::File,
     io::{BufRead, BufReader},
     iter,
@@ -8,9 +8,96 @@ use std::{
 use crate::{AdventYear, Year};
 
 pub fn init() -> Box<dyn AdventYear> {
-    let days: Vec<Box<dyn Fn()>> = vec![Box::new(day1), Box::new(day2), Box::new(day3)];
+    let days: Vec<Box<dyn Fn()>> = vec![
+        Box::new(day1),
+        Box::new(day2),
+        Box::new(day3),
+        Box::new(day4),
+    ];
 
     Box::new(Year { year: 2023, days })
+}
+
+fn day4() {
+    let reader = BufReader::new(File::open("./input/2023/day4").unwrap());
+    let cards = day4_parser(reader);
+
+    println!("Part 1: {}", day4p1_logic(&cards));
+    println!("Part 2: {}", day4p2_logic(cards));
+}
+
+fn day4p2_logic(mut cards: Vec<Card>) -> usize {
+    for i in 0..cards.len() {
+        let wins = cards[i].wins();
+        for j in (i + 1)..(i + 1 + wins) {
+            cards[j].copies += cards[i].copies;
+        }
+    }
+
+    cards.into_iter().map(|card| card.copies).sum()
+}
+
+fn day4p1_logic(cards: &Vec<Card>) -> usize {
+    cards.iter().map(|card| card.compute_points()).sum()
+}
+
+fn day4_parser(reader: impl BufRead) -> Vec<Card> {
+    let mut cards: Vec<Card> = Vec::new();
+
+    for line in reader.lines().map(|x| x.unwrap()) {
+        // skip the card id
+        let mut tokens_iter = line.split_whitespace().skip(2);
+
+        // parse the winning numbers
+        let mut card = Card::new();
+        while let Some(token) = tokens_iter.next() {
+            // end of winning numbers
+            if token == "|" {
+                break;
+            }
+            card.winning.insert(token.parse().unwrap());
+        }
+
+        // parse the numbers this card has
+        while let Some(token) = tokens_iter.next() {
+            card.have.push(token.parse().unwrap());
+        }
+
+        cards.push(card);
+    }
+    cards
+}
+
+struct Card {
+    pub copies: usize,
+    pub have: Vec<u64>,
+    pub winning: HashSet<u64>,
+}
+
+impl Card {
+    pub fn new() -> Self {
+        Card {
+            copies: 1,
+            have: Vec::new(),
+            winning: HashSet::new(),
+        }
+    }
+
+    pub fn compute_points(&self) -> usize {
+        let wins = self.wins();
+        if wins == 0 {
+            0
+        } else {
+            1 << wins - 1
+        }
+    }
+
+    pub fn wins(&self) -> usize {
+        self.have
+            .iter()
+            .filter(|num| self.winning.contains(num))
+            .count()
+    }
 }
 
 fn day3() {
@@ -426,7 +513,8 @@ fn recover_calibration_value(line: String) -> u64 {
 #[cfg(test)]
 mod test {
     use crate::years::year2023::{
-        _day2p1_logic, _day3p1_logic, day1_logic, day2p2_logic, day3p2_logic,
+        _day2p1_logic, _day3p1_logic, day1_logic, day2p2_logic, day3p2_logic, day4_parser,
+        day4p1_logic, day4p2_logic,
     };
 
     #[test]
@@ -494,5 +582,31 @@ zoneight234
 .664.598..";
 
         assert_eq!(467835, day3p2_logic(input.as_bytes()));
+    }
+
+    #[test]
+    fn day4p1_case1() {
+        let input = "Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53
+Card 2: 13 32 20 16 61 | 61 30 68 82 17 32 24 19
+Card 3:  1 21 53 59 44 | 69 82 63 72 16 21 14  1
+Card 4: 41 92 73 84 69 | 59 84 76 51 58  5 54 83
+Card 5: 87 83 26 28 32 | 88 30 70 12 93 22 82 36
+Card 6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11";
+        let cards = day4_parser(input.as_bytes());
+
+        assert_eq!(13, day4p1_logic(&cards));
+    }
+
+    #[test]
+    fn day4p2_case1() {
+        let input = "Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53
+Card 2: 13 32 20 16 61 | 61 30 68 82 17 32 24 19
+Card 3:  1 21 53 59 44 | 69 82 63 72 16 21 14  1
+Card 4: 41 92 73 84 69 | 59 84 76 51 58  5 54 83
+Card 5: 87 83 26 28 32 | 88 30 70 12 93 22 82 36
+Card 6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11";
+        let cards = day4_parser(input.as_bytes());
+
+        assert_eq!(30, day4p2_logic(cards));
     }
 }
