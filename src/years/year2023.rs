@@ -13,9 +13,277 @@ pub fn init() -> Box<dyn AdventYear> {
         Box::new(day2),
         Box::new(day3),
         Box::new(day4),
+        Box::new(day5),
     ];
 
     Box::new(Year { year: 2023, days })
+}
+
+fn day5() {
+    let reader = BufReader::new(File::open("./input/2023/day5").unwrap());
+    let mut almanic = day5_parse(reader);
+    let mut locations: Vec<u64> = almanic.find_locations_p1();
+    locations.sort_unstable();
+    println!("Nearest Location Part 1: {}", locations.first().unwrap());
+
+    let mut location_ranges = almanic.find_locations();
+    location_ranges.sort_unstable_by(|span1, span2| span1.start.cmp(&span2.start));
+    println!(
+        "Nearest Location Part 2: {}",
+        location_ranges.first().unwrap().start
+    );
+}
+
+fn day5_parse(reader: impl BufRead) -> Almanac {
+    let mut line_iter = reader.lines().map(|x| x.unwrap());
+
+    // parse seeds
+    let seeds: Vec<u64> = line_iter
+        .next()
+        .unwrap()
+        .split_whitespace()
+        .filter_map(|seed| seed.parse().ok())
+        .collect();
+    // skip first empty line
+    line_iter.next();
+
+    let mut mappings: Vec<Mapping> = Vec::new();
+
+    while let Some(line) = line_iter.next() {
+        // look for mapping headers
+        let mut mapping = line.split(' ').next().unwrap().split('-');
+        let from: String = mapping.next().unwrap().to_owned();
+        mapping.next();
+        let to: String = mapping.next().unwrap().to_owned();
+
+        let mapping = day5_parse_mappings(&mut line_iter, from, to);
+        mappings.push(mapping);
+    }
+
+    Almanac { seeds, mappings }
+}
+
+fn day5_parse_mappings<T>(line_iter: &mut T, from: String, to: String) -> Mapping
+where
+    T: Iterator<Item = String>,
+{
+    let mut mappings: Vec<[u64; 3]> = Vec::new();
+    // look for mappings
+    while let Some(line) = line_iter.next() {
+        // found end of current mapping, break to outer loop
+        if line.is_empty() {
+            break;
+        }
+
+        // parse the integers from the line into an arrayinto an array
+        let map_range: [u64; 3] = line
+            .split_whitespace()
+            .map(|x| x.parse().unwrap())
+            .collect::<Vec<u64>>()
+            .try_into()
+            .unwrap_or_else(|_| panic!("expected 3 numbers per line\n{}", line));
+        mappings.push(map_range);
+    }
+
+    Mapping {
+        from,
+        to,
+        mappings,
+        sorted: false,
+    }
+}
+
+struct Span {
+    pub start: u64,
+    pub range: u64,
+}
+
+impl Span {
+    pub fn new(start: u64, range: u64) -> Span {
+        Span { start, range }
+    }
+
+    // splits this span
+    // panics if impossible to create two valid spans
+    pub fn split_at(&mut self, at: u64) -> Span {
+        if at <= self.start || at >= self.start + self.range {
+            panic!("Unable to split into two valid spans");
+        }
+
+        let old_range = at - self.start;
+        let new_range = self.range - old_range;
+
+        self.range = old_range;
+
+        Span {
+            start: at,
+            range: new_range,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn to_string(&self) -> String {
+        format!("{}--{}", self.start, self.start + self.range)
+    }
+}
+
+#[allow(dead_code)]
+struct Almanac {
+    pub seeds: Vec<u64>,
+    pub mappings: Vec<Mapping>,
+}
+
+impl Almanac {
+    pub fn find_locations(&mut self) -> Vec<Span> {
+        // build process queue, starting by interpreting seeds as spans
+        let mut process_queue: Vec<(usize, Span)> = self
+            .seeds
+            .chunks(2)
+            .map(|slice| (0, Span::new(slice[0], slice[1])))
+            .collect();
+
+        assert!(!process_queue.is_empty());
+
+        let mut results = Vec::new();
+        while let Some((index, span)) = process_queue.pop() {
+            // span was mapped through last mapping
+            // add to results
+            if index == self.mappings.len() {
+                results.push(span);
+                continue;
+            }
+
+            // map current span, push resulting spans to process queue
+            let mapped = self.mappings[index].map_range(span);
+            process_queue.extend(mapped.into_iter().map(|x| (index + 1, x)));
+        }
+
+        results
+    }
+    pub fn find_locations_p1(&mut self) -> Vec<u64> {
+        self.seeds
+            .iter()
+            .map(|seed| {
+                let mut input: u64 = *seed;
+                for map in self.mappings.iter_mut() {
+                    input = map.map(input);
+                }
+                input
+            })
+            .collect()
+    }
+}
+
+#[allow(dead_code)]
+struct Mapping {
+    from: String,
+    to: String,
+    mappings: Vec<[u64; 3]>,
+    sorted: bool,
+}
+
+#[allow(dead_code)]
+impl Mapping {
+    pub fn new(from: String, to: String) -> Mapping {
+        Mapping {
+            from,
+            to,
+            mappings: Vec::new(),
+            sorted: true,
+        }
+    }
+
+    pub fn add_range(&mut self, from_num: u64, to_num: u64, range: u64) {
+        self.sorted = false;
+        self.mappings.push([to_num, from_num, range]);
+    }
+
+    pub fn map(&mut self, from: u64) -> u64 {
+        self.sort_mappings();
+
+        // iterate over mappings looking for matching range, return "from" if no mapping found
+        for mapping in self.mappings.iter() {
+            // sorted mappings, so no mappings found further along
+            if mapping[1] > from {
+                break;
+            }
+
+            if mapping[1] <= from && (mapping[1] + mapping[2]) > from {
+                let offset = from - mapping[1];
+
+                return mapping[0] + offset;
+            }
+        }
+        from
+    }
+
+    pub fn map_range(&mut self, from: Span) -> Vec<Span> {
+        self.sort_mappings();
+        let mut to = Vec::new();
+
+        let mut span_opt = Some(from);
+        for range in self.mappings.iter() {
+            let mut span = span_opt.take().unwrap();
+            // span above map range, gg go next
+            if range[1] + range[2] <= span.start {
+                span_opt = Some(span);
+                continue;
+            // span below map range, no explicit mappings found, break
+            } else if span.start + span.range <= range[1] {
+                span_opt = Some(span);
+                break;
+            }
+
+            // check for span area below current range and map it implicitly
+            if span.start < range[1] {
+                let above = span.split_at(range[1]);
+                to.push(span);
+                span = above;
+            }
+
+            let mut next = None;
+            // check for span area above current range and save it to for next iteration
+            if span.start + span.range > range[1] + range[2] {
+                next = Some(span.split_at(range[1] + range[2]));
+            }
+
+            // map span and push to results
+            let offset = span.start - range[1];
+            span.start = range[0] + offset;
+            to.push(span);
+
+            // still more span to map, continue
+            if let Some(span) = next {
+                span_opt = Some(span);
+                continue;
+            // no more mapping to do, we're done
+            } else {
+                break;
+            }
+        }
+
+        // implicitly map any remaining span
+        if let Some(span) = span_opt {
+            to.push(span);
+        }
+
+        to
+    }
+
+    /// sort by from range then range
+    fn sort_mappings(&mut self) {
+        // sort if not sorted
+        if !self.sorted {
+            self.mappings.sort_unstable_by(|map1, map2| {
+                if map1[1] == map2[1] {
+                    map1[2].cmp(&map2[2])
+                } else {
+                    map1[1].cmp(&map2[1])
+                }
+            });
+            self.sorted = true;
+        }
+    }
 }
 
 fn day4() {
@@ -517,6 +785,8 @@ mod test {
         day4p1_logic, day4p2_logic,
     };
 
+    use super::{day5_parse, Almanac};
+
     #[test]
     fn day2p2_case1() {
         let input = "Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
@@ -608,5 +878,90 @@ Card 6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11";
         let cards = day4_parser(input.as_bytes());
 
         assert_eq!(30, day4p2_logic(cards));
+    }
+
+    #[test]
+    fn day5p1_case1() {
+        let input = "seeds: 79 14 55 13
+
+seed-to-soil map:
+50 98 2
+52 50 48
+
+soil-to-fertilizer map:
+0 15 37
+37 52 2
+39 0 15
+
+fertilizer-to-water map:
+49 53 8
+0 11 42
+42 0 7
+57 7 4
+
+water-to-light map:
+88 18 7
+18 25 70
+
+light-to-temperature map:
+45 77 23
+81 45 19
+68 64 13
+
+temperature-to-humidity map:
+0 69 1
+1 0 69
+
+humidity-to-location map:
+60 56 37
+56 93 4";
+        let mut almanac: Almanac = day5_parse(input.as_bytes());
+        let mut locations = almanac.find_locations_p1();
+        locations.sort_unstable();
+
+        assert_eq!(35, *locations.first().unwrap());
+    }
+
+    #[test]
+    fn day5p2_case1() {
+        let input = "seeds: 79 14 55 13
+
+seed-to-soil map:
+50 98 2
+52 50 48
+
+soil-to-fertilizer map:
+0 15 37
+37 52 2
+39 0 15
+
+fertilizer-to-water map:
+49 53 8
+0 11 42
+42 0 7
+57 7 4
+
+water-to-light map:
+88 18 7
+18 25 70
+
+light-to-temperature map:
+45 77 23
+81 45 19
+68 64 13
+
+temperature-to-humidity map:
+0 69 1
+1 0 69
+
+humidity-to-location map:
+60 56 37
+56 93 4";
+        let mut almanac: Almanac = day5_parse(input.as_bytes());
+        let mut location_ranges = almanac.find_locations();
+        assert!(!location_ranges.is_empty());
+
+        location_ranges.sort_unstable_by(|span1, span2| span1.start.cmp(&span2.start));
+        assert_eq!(46, location_ranges.first().unwrap().start);
     }
 }
