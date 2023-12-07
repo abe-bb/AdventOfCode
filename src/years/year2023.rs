@@ -29,10 +29,10 @@ fn day7() {
     let mut bids = day7_parse(reader);
     // sort by hands with weakest hand first
     bids.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-    println!("Part 1: Winnings = {}", day7p1_logic(&bids));
+    println!("Part 2: Winnings = {}", day7p2_logic(&bids));
 }
 
-fn day7p1_logic(bids: &Vec<(Hand, u64)>) -> u64 {
+fn day7p2_logic(bids: &Vec<(Hand, u64)>) -> u64 {
     bids.iter()
         .enumerate()
         .map(|(i, (_, bid))| bid * (i as u64 + 1))
@@ -59,17 +59,34 @@ struct Hand {
 
 impl Hand {
     fn strength(cards: &[u8; 5]) -> u8 {
-        let freq = cards
+        let mut freq = cards
             .iter()
             // build hashmap with entry frequencies
             .counts()
             .into_iter()
             // convert key and count to both be u8
             .map(|(key, count)| (*key, count as u8))
-            // sort by count
+            // sort by frequency
             .sorted_unstable_by(|a, b| a.1.cmp(&b.1).reverse())
             .collect_vec();
 
+        // process wilds
+        let mut j = 0;
+        for card in freq.iter_mut() {
+            // found joker freqency
+            if card.0 == 0 {
+                j = card.1;
+                card.1 = 0;
+                break;
+            }
+        }
+
+        // re sort with wild frequency set to 0
+        freq.sort_unstable_by(|a, b| a.1.cmp(&b.1).reverse());
+        // add wild frequency to most frequent card
+        freq[0].1 += j;
+
+        // find hand strength
         match freq[0].1 {
             5 => 6, // five of a kind
             4 => 5, // four of a kind
@@ -128,7 +145,8 @@ impl TryFrom<&str> for Hand {
                 '8' => Ok(8),
                 '9' => Ok(9),
                 'T' => Ok(10),
-                'J' => Ok(11),
+                // J's are wild, score lower than every other card
+                'J' => Ok(0),
                 'Q' => Ok(12),
                 'K' => Ok(13),
                 'A' => Ok(14),
@@ -142,7 +160,6 @@ impl TryFrom<&str> for Hand {
 
         let cards = cards.try_into().unwrap();
 
-        // TODO determine hand strength
         Ok(Hand {
             strength: Hand::strength(&cards),
             cards,
@@ -1205,11 +1222,11 @@ Distance:  9  40  200";
             "QQQJA strength {}; KTJJT strength {}",
             hand1.strength, hand2.strength
         );
-        assert!(hand1 > hand2);
+        assert!(hand1 < hand2);
     }
 
     #[test]
-    fn day7p1_case1() {
+    fn day7p2_case1() {
         let input = "32T3K 765
 T55J5 684
 KK677 28
@@ -1218,6 +1235,6 @@ QQQJA 483";
 
         let mut bids = day7_parse(input.as_bytes());
         bids.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-        assert_eq!(6440, day7p1_logic(&bids))
+        assert_eq!(5905, day7p2_logic(&bids))
     }
 }
