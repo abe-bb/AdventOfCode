@@ -14,9 +14,98 @@ pub fn init() -> Box<dyn AdventYear> {
         Box::new(day3),
         Box::new(day4),
         Box::new(day5),
+        Box::new(day6),
     ];
 
     Box::new(Year { year: 2023, days })
+}
+
+fn day6() {
+    let reader = BufReader::new(File::open("./input/2023/day6").unwrap());
+    let races = day6_parse(reader);
+    let p1: u64 = races
+        .iter()
+        .map(|race| race.ways_to_win().unwrap())
+        .product();
+
+    println!("Part 1: {}", p1);
+
+    let p2_time: String = races.iter().map(|race| race.time.to_string()).collect();
+    let p2_record: String = races.iter().map(|race| race.record.to_string()).collect();
+    let p2_time: u64 = p2_time.parse().unwrap();
+    let p2_record: u64 = p2_record.parse().unwrap();
+    let p2_race = Race::new(p2_time, p2_record);
+    let p2_w2win = p2_race.ways_to_win().unwrap();
+
+    println!("Part 2: {}", p2_w2win);
+}
+
+fn day6_parse(reader: impl BufRead) -> Vec<Race> {
+    let mut lines = reader.lines().map(|x| x.unwrap());
+
+    let times: Vec<u64> = lines
+        .next()
+        .unwrap()
+        .split_whitespace()
+        .skip(1)
+        .map(|x| x.parse().unwrap())
+        .collect();
+    let records: Vec<u64> = lines
+        .next()
+        .unwrap()
+        .split_whitespace()
+        .skip(1)
+        .map(|x| x.parse().unwrap())
+        .collect();
+
+    times
+        .into_iter()
+        .zip(records.into_iter())
+        .map(|(time, record)| Race::new(time, record))
+        .collect()
+}
+
+struct Race {
+    time: u64,
+    record: u64,
+}
+
+impl Race {
+    pub fn new(time: u64, record: u64) -> Self {
+        Race { time, record }
+    }
+
+    pub fn ways_to_win(&self) -> Option<u64> {
+        if let Some((lower, upper)) = self.record_button_hold_times() {
+            let mut exact_count = 0;
+            if lower.ceil() == lower {
+                exact_count += 1;
+            }
+            if upper.floor() == upper {
+                exact_count += 1;
+            }
+
+            Some(upper.floor() as u64 - lower.ceil() as u64 + 1 - exact_count)
+        } else {
+            None
+        }
+    }
+
+    pub fn record_button_hold_times(&self) -> Option<(f64, f64)> {
+        let time = self.time as f64;
+        let record = self.record as f64;
+
+        // half of quadratic formula
+        let upper = (-time - (time.powi(2) - 4. * record).sqrt()) / -2.;
+        // other half of quadratic formula
+        let lower = (-time + (time.powi(2) - 4. * record).sqrt()) / -2.;
+
+        if upper.is_nan() || lower.is_nan() {
+            None
+        } else {
+            Some((lower, upper))
+        }
+    }
 }
 
 fn day5() {
@@ -782,7 +871,7 @@ fn recover_calibration_value(line: String) -> u64 {
 mod test {
     use crate::years::year2023::{
         _day2p1_logic, _day3p1_logic, day1_logic, day2p2_logic, day3p2_logic, day4_parser,
-        day4p1_logic, day4p2_logic,
+        day4p1_logic, day4p2_logic, day6_parse,
     };
 
     use super::{day5_parse, Almanac};
@@ -963,5 +1052,22 @@ humidity-to-location map:
 
         location_ranges.sort_unstable_by(|span1, span2| span1.start.cmp(&span2.start));
         assert_eq!(46, location_ranges.first().unwrap().start);
+    }
+
+    #[test]
+    fn day6p1_case1() {
+        let input = "Time:      7  15   30
+Distance:  9  40  200";
+
+        let races = day6_parse(input.as_bytes());
+        let p1: u64 = races
+            .iter()
+            .map(|race| {
+                let w2win = race.ways_to_win().unwrap();
+                println!("{}", w2win);
+                w2win
+            })
+            .product();
+        assert_eq!(288, p1);
     }
 }
