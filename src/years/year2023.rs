@@ -1,9 +1,12 @@
 use std::{
+    cmp::Ordering,
     collections::{HashMap, HashSet},
     fs::File,
     io::{BufRead, BufReader},
     iter,
 };
+
+use itertools::Itertools;
 
 use crate::{AdventYear, Year};
 
@@ -15,9 +18,136 @@ pub fn init() -> Box<dyn AdventYear> {
         Box::new(day4),
         Box::new(day5),
         Box::new(day6),
+        Box::new(day7),
     ];
 
     Box::new(Year { year: 2023, days })
+}
+
+fn day7() {
+    let reader = BufReader::new(File::open("./input/2023/day7").unwrap());
+    let mut bids = day7_parse(reader);
+    // sort by hands with weakest hand first
+    bids.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+    println!("Part 1: Winnings = {}", day7p1_logic(&bids));
+}
+
+fn day7p1_logic(bids: &Vec<(Hand, u64)>) -> u64 {
+    bids.iter()
+        .enumerate()
+        .map(|(i, (_, bid))| bid * (i as u64 + 1))
+        .sum()
+}
+
+fn day7_parse(reader: impl BufRead) -> Vec<(Hand, u64)> {
+    // awww yisss, single iter chain parser
+    // shout out to itertools, I just found you and I already love you
+    reader
+        .lines()
+        .map(|x| x.unwrap())
+        .flat_map(|x| x.split_whitespace().map(|x| x.to_owned()).collect_vec())
+        .tuples()
+        .map(|(hand, bid)| (Hand::try_from(hand.as_str()).unwrap(), bid.parse().unwrap()))
+        .collect()
+}
+
+#[derive(PartialEq, Eq)]
+struct Hand {
+    cards: [u8; 5],
+    strength: u8,
+}
+
+impl Hand {
+    fn strength(cards: &[u8; 5]) -> u8 {
+        let freq = cards
+            .iter()
+            // build hashmap with entry frequencies
+            .counts()
+            .into_iter()
+            // convert key and count to both be u8
+            .map(|(key, count)| (*key, count as u8))
+            // sort by count
+            .sorted_unstable_by(|a, b| a.1.cmp(&b.1).reverse())
+            .collect_vec();
+
+        match freq[0].1 {
+            5 => 6, // five of a kind
+            4 => 5, // four of a kind
+            3 => match freq[1].1 {
+                2 => 4, // full house
+                1 => 3, // three of a kind
+                _ => unreachable!(),
+            },
+            2 => match freq[1].1 {
+                2 => 2, // two pair
+                1 => 1, // one pair
+                _ => unreachable!(),
+            },
+            1 => 0, // high card
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl PartialOrd for Hand {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+// Sort hands first by strength, then by individual card strength
+impl Ord for Hand {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let mut result = self.strength.cmp(&other.strength);
+
+        for (card, other_card) in self.cards.iter().zip(other.cards.iter()) {
+            if result != Ordering::Equal {
+                break;
+            }
+
+            result = card.cmp(other_card);
+        }
+
+        result
+    }
+}
+
+impl TryFrom<&str> for Hand {
+    type Error = &'static str;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let cards: Vec<u8> = value
+            .chars()
+            .map(|c| match c {
+                '2' => Ok(2),
+                '3' => Ok(3),
+                '4' => Ok(4),
+                '5' => Ok(5),
+                '6' => Ok(6),
+                '7' => Ok(7),
+                '8' => Ok(8),
+                '9' => Ok(9),
+                'T' => Ok(10),
+                'J' => Ok(11),
+                'Q' => Ok(12),
+                'K' => Ok(13),
+                'A' => Ok(14),
+                _ => Err("Unexpected character"),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        if cards.len() != 5 {
+            return Err("Hands must be 5 cards");
+        }
+
+        let cards = cards.try_into().unwrap();
+
+        // TODO determine hand strength
+        Ok(Hand {
+            strength: Hand::strength(&cards),
+            cards,
+        })
+    }
 }
 
 fn day6() {
@@ -869,12 +999,7 @@ fn recover_calibration_value(line: String) -> u64 {
 
 #[cfg(test)]
 mod test {
-    use crate::years::year2023::{
-        _day2p1_logic, _day3p1_logic, day1_logic, day2p2_logic, day3p2_logic, day4_parser,
-        day4p1_logic, day4p2_logic, day6_parse,
-    };
-
-    use super::{day5_parse, Almanac};
+    use super::*;
 
     #[test]
     fn day2p2_case1() {
@@ -1069,5 +1194,30 @@ Distance:  9  40  200";
             })
             .product();
         assert_eq!(288, p1);
+    }
+
+    #[test]
+    fn day7_hand_ordering() {
+        let hand1 = Hand::try_from("QQQJA").unwrap();
+        let hand2 = Hand::try_from("KTJJT").unwrap();
+
+        println!(
+            "QQQJA strength {}; KTJJT strength {}",
+            hand1.strength, hand2.strength
+        );
+        assert!(hand1 > hand2);
+    }
+
+    #[test]
+    fn day7p1_case1() {
+        let input = "32T3K 765
+T55J5 684
+KK677 28
+KTJJT 220
+QQQJA 483";
+
+        let mut bids = day7_parse(input.as_bytes());
+        bids.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        assert_eq!(6440, day7p1_logic(&bids))
     }
 }
