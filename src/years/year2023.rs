@@ -19,9 +19,136 @@ pub fn init() -> Box<dyn AdventYear> {
         Box::new(day5),
         Box::new(day6),
         Box::new(day7),
+        Box::new(day8),
     ];
 
     Box::new(Year { year: 2023, days })
+}
+
+fn day8() {
+    let reader = BufReader::new(File::open("./input/2023/day8").unwrap());
+    let (instructions, mut adjacency) = day8_parse(reader);
+
+    println!(
+        "Part 1 Num Steps: {}",
+        day8_p1(&instructions, &mut adjacency)
+    );
+
+    println!(
+        "Part 2 Num Steps: {}",
+        day8_p2(&instructions, &mut adjacency)
+    );
+}
+
+fn day8_p2(instructions: &str, adjacency: &mut AdjacencyGraph) -> u64 {
+    let nodes = adjacency
+        .adjacency
+        .iter()
+        .filter_map(|(key, _)| -> Option<&str> {
+            if key.as_bytes()[2] as char == 'A' {
+                Some(key)
+            } else {
+                None
+            }
+        })
+        .collect_vec();
+
+    let mut step_counts = nodes
+        .iter()
+        .map(|start_node| {
+            let mut node = *start_node;
+            let mut index = 0;
+            let mut steps = 0;
+
+            while node.as_bytes()[2] as char != 'Z' {
+                let left = instructions.as_bytes()[index] as char == 'L';
+                node = adjacency.turn(node, left);
+                steps += 1;
+
+                // increment instruction index
+                index = (index + 1) % instructions.len();
+            }
+
+            steps
+        })
+        .collect_vec();
+
+    // sort descending
+    step_counts.sort_unstable_by(|a, b| a.cmp(b).reverse());
+
+    // greatest common factor
+    let gcf = instructions.len();
+    // least common multiple
+    let mut lcm = step_counts.pop().unwrap() * step_counts.pop().unwrap() / gcf;
+
+    for steps in step_counts {
+        lcm = lcm * steps / gcf;
+    }
+
+    lcm as u64
+}
+
+fn day8_p1(instructions: &str, adjacency: &mut AdjacencyGraph) -> u64 {
+    let mut node = "AAA";
+    let mut index = 0;
+    let mut steps = 0;
+
+    while node != "ZZZ" {
+        let left = instructions.as_bytes()[index] as char == 'L';
+        node = adjacency.turn(node, left);
+        steps += 1;
+
+        // increment instruction index
+        index = (index + 1) % instructions.len();
+    }
+
+    steps
+}
+
+fn day8_parse(reader: impl BufRead) -> (String, AdjacencyGraph) {
+    let mut lines = reader.lines().map(|x| x.unwrap());
+    // read directions
+    let directions = lines.next().unwrap();
+    lines.next();
+
+    // read nodes
+    let adjacency = lines.fold(HashMap::new(), |mut adjacency, line| {
+        let mut nodes: Vec<String> = line
+            .split([' ', ',', '(', ')'])
+            .filter_map(|x| {
+                if x.len() == 3 {
+                    Some(x.to_owned())
+                } else {
+                    None
+                }
+            })
+            .collect_vec();
+
+        let right = nodes.pop().unwrap();
+        let left = nodes.pop().unwrap();
+        let node = nodes.pop().unwrap();
+
+        adjacency.insert(node, (left, right));
+        adjacency
+    });
+
+    (directions, AdjacencyGraph { adjacency })
+}
+
+struct AdjacencyGraph {
+    pub adjacency: HashMap<String, (String, String)>,
+}
+
+impl AdjacencyGraph {
+    pub fn turn<'a, 'b>(&'a self, node: &'b str, left: bool) -> &'a str {
+        let choice = self.adjacency.get(node).unwrap();
+
+        if left {
+            &choice.0
+        } else {
+            &choice.1
+        }
+    }
 }
 
 fn day7() {
@@ -1236,5 +1363,21 @@ QQQJA 483";
         let mut bids = day7_parse(input.as_bytes());
         bids.sort_unstable_by(|a, b| a.0.cmp(&b.0));
         assert_eq!(5905, day7p2_logic(&bids))
+    }
+
+    #[test]
+    fn day8p1_case1() {
+        let input = "RL
+
+AAA = (BBB, CCC)
+BBB = (DDD, EEE)
+CCC = (ZZZ, GGG)
+DDD = (DDD, DDD)
+EEE = (EEE, EEE)
+GGG = (GGG, GGG)
+ZZZ = (ZZZ, ZZZ)";
+
+        let (instructions, mut adjacency) = day8_parse(input.as_bytes());
+        assert_eq!(2, day8_p1(&instructions, &mut adjacency));
     }
 }
