@@ -3,7 +3,7 @@ use std::{
     collections::{HashMap, HashSet},
     fs::File,
     io::{BufRead, BufReader},
-    iter,
+    iter::{self, once},
 };
 
 use itertools::Itertools;
@@ -20,9 +20,77 @@ pub fn init() -> Box<dyn AdventYear> {
         Box::new(day6),
         Box::new(day7),
         Box::new(day8),
+        Box::new(day9),
     ];
 
     Box::new(Year { year: 2023, days })
+}
+
+fn day9() {
+    let reader = BufReader::new(File::open("./input/2023/day9").unwrap());
+    let history = day9_parse(reader);
+    let (p2_result, p1_result) = history.iter().fold((0i64, 0i64), |(back, forward), diffs| {
+        let (b, f) = day9_predict_values(diffs);
+        (back + b, forward + f)
+    });
+    println!("Part 1: {}", p1_result);
+    println!("Part 2: {}", p2_result);
+}
+
+fn day9_predict_values(values: &Vec<i64>) -> (i64, i64) {
+    let mut differences: Vec<Vec<i64>> = Vec::new();
+    let mut all_zero = false;
+
+    // find differences while differences are not all 0
+    while !all_zero {
+        all_zero = true;
+        let result;
+        // scope for values reference
+        {
+            let mut values = values;
+            if differences.len() > 0 {
+                values = differences.last().unwrap();
+            }
+
+            result = values
+                .iter()
+                .tuple_windows()
+                .map(|(a, b)| {
+                    let diff = b - a;
+                    if all_zero && diff != 0 {
+                        all_zero = false;
+                    }
+                    diff
+                })
+                .collect_vec();
+        } // drop values reference, so differences can be borrowed as mutable
+
+        differences.push(result);
+    }
+
+    let mut diff_iter = once(values).chain(differences.iter()).rev();
+    let init = diff_iter.next().unwrap();
+    let mut forward_prediction: i64 = *init.last().unwrap();
+    let mut backward_prediction: i64 = *init.first().unwrap();
+    assert!(forward_prediction == 0);
+    for diffs in diff_iter {
+        forward_prediction = diffs.last().unwrap() + forward_prediction;
+        backward_prediction = diffs.first().unwrap() - backward_prediction;
+    }
+
+    (backward_prediction, forward_prediction)
+}
+
+fn day9_parse(reader: impl BufRead) -> Vec<Vec<i64>> {
+    reader
+        .lines()
+        .map(|x| x.unwrap())
+        .map(|line| {
+            line.split_whitespace()
+                .map(|x| x.parse().unwrap())
+                .collect_vec()
+        })
+        .collect_vec()
 }
 
 fn day8() {
@@ -1379,5 +1447,20 @@ ZZZ = (ZZZ, ZZZ)";
 
         let (instructions, mut adjacency) = day8_parse(input.as_bytes());
         assert_eq!(2, day8_p1(&instructions, &mut adjacency));
+    }
+
+    #[test]
+    fn day9p1_case1() {
+        let input = "0 3 6 9 12 15
+1 3 6 10 15 21
+10 13 16 21 30 45";
+
+        let history = day9_parse(input.as_bytes());
+        let (p2_result, p1_result) = history.iter().fold((0i64, 0i64), |(back, forward), diffs| {
+            let (b, f) = day9_predict_values(diffs);
+            (back + b, forward + f)
+        });
+        assert_eq!(114, p1_result);
+        assert_eq!(2, p2_result);
     }
 }
