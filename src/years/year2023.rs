@@ -1,6 +1,6 @@
 use std::{
     cmp::Ordering,
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     fs::File,
     io::{BufRead, BufReader},
     iter::{self, once},
@@ -21,9 +21,340 @@ pub fn init() -> Box<dyn AdventYear> {
         Box::new(day7),
         Box::new(day8),
         Box::new(day9),
+        Box::new(day10),
     ];
 
     Box::new(Year { year: 2023, days })
+}
+
+fn day10() {
+    let reader = BufReader::new(File::open("./input/2023/day10").unwrap());
+    let mut land = day10_parse(reader);
+
+    println!("Part 1: {}", land.find_furthest_length());
+    println!("Part 2: {}", land.count_enclosed_ground());
+}
+
+fn day10_parse(reader: impl BufRead) -> Landscape {
+    let mut start = None;
+    let grid = reader
+        .lines()
+        .map(|x| x.unwrap())
+        .enumerate()
+        .map(|(i, line)| {
+            line.chars()
+                .enumerate()
+                .map(|(j, c)| {
+                    if c == 'S' {
+                        assert!(start.is_none(), "already found start, cannot have 2");
+                        start = Some((i, j));
+                    }
+                    c.into()
+                })
+                .collect_vec()
+        })
+        .collect_vec();
+
+    Landscape {
+        grid,
+        start: start.unwrap(),
+    }
+}
+
+struct Landscape {
+    grid: Vec<Vec<Tile>>,
+    start: (usize, usize),
+}
+
+impl Landscape {
+    fn connections(&self, index: (usize, usize), ignore_visited: bool) -> Vec<(usize, usize)> {
+        let mut connections = Vec::new();
+        let (row, col) = index;
+        let current = &self.grid[row][col];
+
+        // check north
+        if row > 0 {
+            if (!self.grid[row - 1][col].visited || ignore_visited)
+                && current.connections[0]
+                && self.grid[row - 1][col].connections[2]
+            {
+                connections.push((row - 1, col));
+            }
+        }
+        // check south
+        if row < (self.grid.len() - 1) {
+            if (!self.grid[row + 1][col].visited || ignore_visited)
+                && current.connections[2]
+                && self.grid[row + 1][col].connections[0]
+            {
+                connections.push((row + 1, col));
+            }
+        }
+        // check west
+        if col > 0 {
+            if (!self.grid[row][col - 1].visited || ignore_visited)
+                && current.connections[3]
+                && self.grid[row][col - 1].connections[1]
+            {
+                connections.push((row, col - 1));
+            }
+        }
+        // check east
+        if col < self.grid[row].len() - 1 {
+            if (!self.grid[row][col + 1].visited || ignore_visited)
+                && current.connections[1]
+                && self.grid[row][col + 1].connections[3]
+            {
+                connections.push((row, col + 1));
+            }
+        }
+        connections
+    }
+
+    pub fn find_furthest_length(&mut self) -> usize {
+        // breadth first search
+
+        // initialize distance and processing queue
+        let mut p_queue = VecDeque::new();
+        p_queue.push_front(self.start.clone());
+        self.grid[self.start.0][self.start.1].length = Some(0);
+
+        // perform search
+        while let Some((row, col)) = p_queue.pop_back() {
+            // mark current node as visited
+            self.grid[row][col].visited = true;
+
+            let connections = self.connections((row, col), false);
+            for (r, c) in connections {
+                if let Some(len) = self.grid[r][c].length {
+                    // found loop connection point (also the distance furthest from start)
+
+                    // set loop tiles
+                    self.set_loop((r, c), (row, col));
+
+                    // return lenght
+                    return len;
+                }
+
+                // set parent
+                self.grid[r][c].parent = Some((row, col));
+
+                // set lengths for connections and add them to processing queue
+                self.grid[r][c].length = Some(self.grid[row][col].length.unwrap() + 1);
+                p_queue.push_front((r, c));
+            }
+        }
+
+        panic!("unable to find loop (possibly invalid graph)");
+    }
+
+    // counts the number of ground tiles enclosed by the loop
+    // find_furthest_length must be called before this function
+    pub fn count_enclosed_ground(&mut self) -> usize {
+        let mut contained = 0;
+
+        // iterate over every cell, updating even/odd counts
+        for row in 0..self.grid.len() {
+            let mut up: Option<bool> = None;
+
+            // first character
+            if self.grid[row][0].is_loop {
+                match self.grid[row][0].c {
+                    'L' => up = Some(true),
+                    'F' => up = Some(false),
+                    '|' => self.grid[row][0].left_even = !self.grid[row][0].left_even,
+                    _ => unreachable!(),
+                }
+            }
+
+            for col in 1..self.grid[row].len() {
+                // this tile is part of the loop, update raycast parity
+                if self.grid[row][col].is_loop && self.grid[row][col].c != '-' {
+                    if self.grid[row][col].c == '|' {
+                        self.grid[row][col].left_even = !self.grid[row][col - 1].left_even;
+                    // tile is corner piece
+                    } else {
+                        if let Some(up) = up.take() {
+                            match self.grid[row][col].c {
+                                'J' => {
+                                    // crossed, flip parity
+                                    if !up {
+                                        self.grid[row][col].left_even =
+                                            !self.grid[row][col - 1].left_even;
+                                    // no cross, don't flip parity
+                                    } else {
+                                        self.grid[row][col].left_even =
+                                            self.grid[row][col - 1].left_even;
+                                    }
+                                }
+                                '7' => {
+                                    // crossed, flip parity
+                                    if up {
+                                        self.grid[row][col].left_even =
+                                            !self.grid[row][col - 1].left_even;
+                                    // no cross, don't flip parity
+                                    } else {
+                                        self.grid[row][col].left_even =
+                                            self.grid[row][col - 1].left_even;
+                                    }
+                                }
+                                _ => {
+                                    unreachable!()
+                                }
+                            }
+                        } else {
+                            // save pipe direction
+                            match self.grid[row][col].c {
+                                'L' => up = Some(true),
+                                'F' => up = Some(false),
+                                _ => unreachable!(),
+                            }
+
+                            // maintain parity
+                            self.grid[row][col].left_even = self.grid[row][col - 1].left_even;
+                        }
+                    }
+                // this title is not part of the loop, maintain parity
+                } else {
+                    self.grid[row][col].left_even = self.grid[row][col - 1].left_even;
+                }
+
+                // left is odd, increment count
+                if !self.grid[row][col].is_loop && !self.grid[row][col].left_even {
+                    contained += 1;
+                }
+            }
+        }
+
+        contained
+    }
+
+    // sets all loop tiles
+    fn set_loop(&mut self, index_1: (usize, usize), index_2: (usize, usize)) {
+        let mut p_stack: Vec<(usize, usize)> = vec![index_1, index_2];
+
+        while let Some((row, col)) = p_stack.pop() {
+            if let Some((r, c)) = self.grid[row][col].parent {
+                p_stack.push((r, c));
+            }
+
+            self.grid[row][col].is_loop = true;
+        }
+        assert!(self.grid[self.start.0][self.start.1].is_loop);
+
+        // determine what shape starting tile is
+        let connections = self.connections(self.start, true);
+        assert!(connections.len() >= 2);
+
+        let connections = connections
+            .into_iter()
+            .filter(|(row, col)| self.grid[*row][*col].is_loop)
+            .collect_vec();
+
+        assert_eq!(2, connections.len());
+
+        let mut dir: Vec<u8> = Vec::new();
+        for conn in connections {
+            // connection is north
+            if conn.0 < self.start.0 {
+                dir.push(0);
+            // connection is south
+            } else if conn.0 > self.start.0 {
+                dir.push(2);
+            // connection is east
+            } else if conn.1 > self.start.1 {
+                dir.push(1);
+            // connection is west
+            } else if conn.1 < self.start.1 {
+                dir.push(3);
+            } else {
+                panic!("invalid connection");
+            }
+        }
+
+        // sort by verticality (descending)
+        dir.sort_unstable_by(|a, b| {
+            if *a == 0 || *a == 2 {
+                if *b == 0 || *b == 2 {
+                    Ordering::Equal
+                } else {
+                    Ordering::Greater
+                }
+            } else {
+                if *b == 0 || *b == 2 {
+                    Ordering::Less
+                } else {
+                    Ordering::Equal
+                }
+            }
+        });
+        dir.reverse();
+
+        match dir[0] {
+            // one end above
+            0 => {
+                match dir[1] {
+                    // |
+                    2 => self.grid[self.start.0][self.start.1].c = '|',
+                    // L
+                    1 => self.grid[self.start.0][self.start.1].c = 'L',
+                    // J
+                    3 => self.grid[self.start.0][self.start.1].c = 'J',
+                    _ => unreachable!(),
+                }
+            }
+            // one end below
+            2 => match dir[1] {
+                0 => self.grid[self.start.0][self.start.1].c = '|',
+                1 => self.grid[self.start.0][self.start.1].c = 'F',
+                3 => self.grid[self.start.0][self.start.1].c = '7',
+                _ => unreachable!(),
+            },
+            // horizontal
+            x => {
+                assert!(x == 1 || x == 3);
+                assert!(dir[1] == 1 || dir[1] == 3);
+                self.grid[self.start.0][self.start.1].c = '-';
+            }
+        }
+    }
+}
+
+struct Tile {
+    pub c: char,
+    pub is_loop: bool,
+    // north, east, south, west
+    pub connections: [bool; 4],
+    pub visited: bool,
+    pub parent: Option<(usize, usize)>,
+    pub left_even: bool,
+    pub length: Option<usize>,
+}
+
+impl From<char> for Tile {
+    fn from(value: char) -> Self {
+        let connections = match value {
+            '|' => [true, false, true, false],
+            '-' => [false, true, false, true],
+            'L' => [true, true, false, false],
+            'J' => [true, false, false, true],
+            '7' => [false, false, true, true],
+            'F' => [false, true, true, false],
+            '.' => [false, false, false, false],
+            'S' => [true, true, true, true],
+            x => panic!("invalid character: {}", x),
+        };
+
+        Tile {
+            c: value,
+            is_loop: false,
+            connections,
+            visited: false,
+            parent: None,
+            left_even: true,
+            length: None,
+        }
+    }
 }
 
 fn day9() {
@@ -1462,5 +1793,82 @@ ZZZ = (ZZZ, ZZZ)";
         });
         assert_eq!(114, p1_result);
         assert_eq!(2, p2_result);
+    }
+
+    #[test]
+    fn day10p1_case1() {
+        let input = ".....
+.S-7.
+.|.|.
+.L-J.
+.....";
+
+        let mut land = day10_parse(input.as_bytes());
+        assert_eq!(4, land.find_furthest_length());
+    }
+
+    #[test]
+    fn day10p1_case2() {
+        let input = "..F7.
+.FJ|.
+SJ.L7
+|F--J
+LJ...";
+
+        let mut land = day10_parse(input.as_bytes());
+        assert_eq!(8, land.find_furthest_length());
+    }
+
+    #[test]
+    fn day10p2_case1() {
+        let input = "...........
+.S-------7.
+.|F-----7|.
+.||.....||.
+.||.....||.
+.|L-7.F-J|.
+.|..|.|..|.
+.L--J.L--J.
+...........";
+
+        let mut land = day10_parse(input.as_bytes());
+        land.find_furthest_length();
+        assert_eq!(4, land.count_enclosed_ground());
+    }
+
+    #[test]
+    fn day10p2_case2() {
+        let input = ".F----7F7F7F7F-7....
+.|F--7||||||||FJ....
+.||.FJ||||||||L7....
+FJL7L7LJLJ||LJ.L-7..
+L--J.L7...LJS7F-7L7.
+....F-J..F7FJ|L7L7L7
+....L7.F7||L7|.L7L7|
+.....|FJLJ|FJ|F7|.LJ
+....FJL-7.||.||||...
+....L---J.LJ.LJLJ...";
+
+        let mut land = day10_parse(input.as_bytes());
+        land.find_furthest_length();
+        assert_eq!(8, land.count_enclosed_ground());
+    }
+
+    #[test]
+    fn day10p2_case3() {
+        let input = "FF7FSF7F7F7F7F7F---7
+L|LJ||||||||||||F--J
+FL-7LJLJ||||||LJL-77
+F--JF--7||LJLJ7F7FJ-
+L---JF-JLJ.||-FJLJJ7
+|F|F-JF---7F7-L7L|7|
+|FFJF7L7F-JF7|JL---7
+7-L-JL7||F7|L7F-7F7|
+L.L7LFJ|||||FJL7||LJ
+L7JLJL-JLJLJL--JLJ.L";
+
+        let mut land = day10_parse(input.as_bytes());
+        land.find_furthest_length();
+        assert_eq!(10, land.count_enclosed_ground());
     }
 }
