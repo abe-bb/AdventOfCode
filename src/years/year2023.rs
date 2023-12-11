@@ -22,9 +22,143 @@ pub fn init() -> Box<dyn AdventYear> {
         Box::new(day8),
         Box::new(day9),
         Box::new(day10),
+        Box::new(day11),
     ];
 
     Box::new(Year { year: 2023, days })
+}
+
+fn day11() {
+    let reader = BufReader::new(File::open("./input/2023/day11").unwrap());
+    let mut map = day11_parse(reader);
+    map.cosmic_inflate();
+    println!("Part 1: {}", map.sum_pair_paths());
+}
+
+fn day11_parse(reader: impl BufRead) -> GalaxyMap {
+    let mut count = -1;
+
+    let map = reader
+        .lines()
+        .map(|x| x.unwrap())
+        .map(|line| {
+            line.chars()
+                .map(|c| match c {
+                    '.' => ST::Empty,
+                    '#' => {
+                        count += 1;
+                        ST::Galaxy(count)
+                    }
+                    x => panic!("invalid character: {}", x),
+                })
+                .collect_vec()
+        })
+        .collect_vec();
+
+    GalaxyMap {
+        map,
+        galaxies: None,
+    }
+}
+
+#[derive(Debug, Clone)]
+enum ST {
+    Empty,
+    Galaxy(i64),
+}
+
+#[derive(Debug)]
+struct GalaxyMap {
+    map: Vec<Vec<ST>>,
+    galaxies: Option<Vec<(usize, usize)>>,
+}
+
+impl GalaxyMap {
+    // calculate cosmic inflation
+    pub fn cosmic_inflate(&mut self) {
+        // invalidate galaxy list
+        self.galaxies = None;
+
+        let mut empty_cols = vec![true; self.map[0].len()];
+        let mut empty_rows: Vec<usize> = Vec::new();
+
+        // find empty rows and columns
+        for i in (0..(self.map.len())).rev() {
+            let mut row_empty = true;
+
+            for (j, tile) in self.map[i].iter().enumerate() {
+                if let ST::Galaxy(_) = tile {
+                    empty_cols[j] = false;
+                    row_empty = false;
+                }
+            }
+
+            if row_empty {
+                empty_rows.push(i);
+            }
+        }
+
+        // duplicate empty rows
+        for row in empty_rows {
+            self.map.insert(row, vec![ST::Empty; empty_cols.len()]);
+        }
+
+        // duplicate empty cols
+        for (col, empty) in empty_cols.into_iter().enumerate().rev() {
+            // skip non empty cols
+            if !empty {
+                continue;
+            }
+
+            for row in self.map.iter_mut() {
+                row.insert(col, ST::Empty)
+            }
+        }
+    }
+
+    fn compute_galaxies(&mut self) {
+        self.galaxies = Some(Vec::new());
+        for row in 0..self.map.len() {
+            for col in 0..self.map[row].len() {
+                if let ST::Galaxy(_) = self.map[row][col] {
+                    self.galaxies.as_mut().unwrap().push((row, col));
+                }
+            }
+        }
+    }
+
+    pub fn sum_pair_paths(&mut self) -> usize {
+        self.compute_galaxies();
+        let galaxies = &self.galaxies.as_ref().unwrap();
+
+        let mut sum: usize = 0;
+
+        for a in 0..galaxies.len() {
+            for b in (a + 1)..galaxies.len() {
+                // sum the distance between pairs in the x and y directions
+                sum +=
+                    galaxies[a].0.abs_diff(galaxies[b].0) + galaxies[a].1.abs_diff(galaxies[b].1);
+            }
+        }
+
+        sum
+    }
+}
+
+impl ToString for GalaxyMap {
+    fn to_string(&self) -> String {
+        self.map
+            .iter()
+            .flat_map(|row| {
+                row.iter()
+                    .map(|st| match st {
+                        ST::Empty => '.',
+                        ST::Galaxy(_) => '#',
+                    })
+                    .chain(once('\n'))
+            })
+            .collect()
+    }
 }
 
 fn day10() {
