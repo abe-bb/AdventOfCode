@@ -1,5 +1,5 @@
 use std::{
-    cmp::Ordering,
+    cmp::{self, Ordering},
     collections::{HashMap, HashSet, VecDeque},
     fs::File,
     io::{BufRead, BufReader},
@@ -32,22 +32,24 @@ fn day11() {
     let reader = BufReader::new(File::open("./input/2023/day11").unwrap());
     let mut map = day11_parse(reader);
     map.cosmic_inflate();
-    println!("Part 1: {}", map.sum_pair_paths());
+    println!("Part 1 {}", map.sum_pair_paths(2));
+    println!("Part 2 {}", map.sum_pair_paths(1000000));
 }
 
 fn day11_parse(reader: impl BufRead) -> GalaxyMap {
-    let mut count = -1;
-
+    let mut galaxies = Vec::new();
     let map = reader
         .lines()
         .map(|x| x.unwrap())
-        .map(|line| {
+        .enumerate()
+        .map(|(row, line)| {
             line.chars()
-                .map(|c| match c {
+                .enumerate()
+                .map(|(col, c)| match c {
                     '.' => ST::Empty,
                     '#' => {
-                        count += 1;
-                        ST::Galaxy(count)
+                        galaxies.push((row, col));
+                        ST::Galaxy
                     }
                     x => panic!("invalid character: {}", x),
                 })
@@ -55,30 +57,25 @@ fn day11_parse(reader: impl BufRead) -> GalaxyMap {
         })
         .collect_vec();
 
-    GalaxyMap {
-        map,
-        galaxies: None,
-    }
+    GalaxyMap { map, galaxies }
 }
 
 #[derive(Debug, Clone)]
 enum ST {
     Empty,
-    Galaxy(i64),
+    Galaxy,
+    Inflated,
 }
 
 #[derive(Debug)]
 struct GalaxyMap {
     map: Vec<Vec<ST>>,
-    galaxies: Option<Vec<(usize, usize)>>,
+    galaxies: Vec<(usize, usize)>,
 }
 
 impl GalaxyMap {
     // calculate cosmic inflation
     pub fn cosmic_inflate(&mut self) {
-        // invalidate galaxy list
-        self.galaxies = None;
-
         let mut empty_cols = vec![true; self.map[0].len()];
         let mut empty_rows: Vec<usize> = Vec::new();
 
@@ -87,7 +84,7 @@ impl GalaxyMap {
             let mut row_empty = true;
 
             for (j, tile) in self.map[i].iter().enumerate() {
-                if let ST::Galaxy(_) = tile {
+                if let ST::Galaxy = tile {
                     empty_cols[j] = false;
                     row_empty = false;
                 }
@@ -98,12 +95,13 @@ impl GalaxyMap {
             }
         }
 
-        // duplicate empty rows
         for row in empty_rows {
-            self.map.insert(row, vec![ST::Empty; empty_cols.len()]);
+            self.map[row]
+                .iter_mut()
+                .for_each(|tile| *tile = ST::Inflated);
         }
 
-        // duplicate empty cols
+        // replace Empty with Inflated in cols
         for (col, empty) in empty_cols.into_iter().enumerate().rev() {
             // skip non empty cols
             if !empty {
@@ -111,33 +109,40 @@ impl GalaxyMap {
             }
 
             for row in self.map.iter_mut() {
-                row.insert(col, ST::Empty)
+                row[col] = ST::Inflated;
             }
         }
     }
 
-    fn compute_galaxies(&mut self) {
-        self.galaxies = Some(Vec::new());
-        for row in 0..self.map.len() {
-            for col in 0..self.map[row].len() {
-                if let ST::Galaxy(_) = self.map[row][col] {
-                    self.galaxies.as_mut().unwrap().push((row, col));
-                }
-            }
-        }
-    }
-
-    pub fn sum_pair_paths(&mut self) -> usize {
-        self.compute_galaxies();
-        let galaxies = &self.galaxies.as_ref().unwrap();
+    pub fn sum_pair_paths(&mut self, inflation_factor: usize) -> usize {
+        let galaxies = &self.galaxies;
 
         let mut sum: usize = 0;
 
         for a in 0..galaxies.len() {
             for b in (a + 1)..galaxies.len() {
-                // sum the distance between pairs in the x and y directions
-                sum +=
-                    galaxies[a].0.abs_diff(galaxies[b].0) + galaxies[a].1.abs_diff(galaxies[b].1);
+                let row_diff = galaxies[a].0.abs_diff(galaxies[b].0);
+                let col_diff = galaxies[a].1.abs_diff(galaxies[b].1);
+                let row_min = cmp::min(galaxies[a].0, galaxies[b].0);
+                let col_min = cmp::min(galaxies[a].1, galaxies[b].1);
+
+                // calculate row distance
+                for r in row_min..(row_min + row_diff) {
+                    if let ST::Inflated = self.map[r][col_min] {
+                        sum += inflation_factor;
+                    } else {
+                        sum += 1;
+                    }
+                }
+
+                // calculate col distance
+                for c in col_min..(col_diff + col_min) {
+                    if let ST::Inflated = self.map[row_min][c] {
+                        sum += inflation_factor;
+                    } else {
+                        sum += 1;
+                    }
+                }
             }
         }
 
@@ -153,7 +158,8 @@ impl ToString for GalaxyMap {
                 row.iter()
                     .map(|st| match st {
                         ST::Empty => '.',
-                        ST::Galaxy(_) => '#',
+                        ST::Galaxy => '#',
+                        ST::Inflated => '~',
                     })
                     .chain(once('\n'))
             })
