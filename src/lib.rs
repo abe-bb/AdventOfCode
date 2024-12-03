@@ -5,6 +5,7 @@ pub fn init() -> AdventManager {
 
     years.push(years::year2022::init());
     years.push(years::year2023::init());
+    years.push(years::year2024::init());
 
     AdventManager::new(years)
 }
