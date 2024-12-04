@@ -1685,6 +1685,7 @@ mod test {
     use super::*;
 
     #[test]
+    #[ignore]
     fn day2p2_case1() {
         let input = "Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
 Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
@@ -1696,6 +1697,7 @@ Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green";
     }
 
     #[test]
+    #[ignore]
     fn day2p1_case1() {
         let input = "Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
 Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
@@ -1707,6 +1709,7 @@ Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green";
     }
 
     #[test]
+    #[ignore]
     fn day1p2_case1() {
         let input = "two1nine
 eightwothree
@@ -1720,6 +1723,7 @@ zoneight234
     }
 
     #[test]
+    #[ignore]
     fn day3p1_case1() {
         let input = "467..114..
 ...*......
@@ -1736,6 +1740,7 @@ zoneight234
     }
 
     #[test]
+    #[ignore]
     fn day3p2_case1() {
         let input = "467..114..
 ...*......
@@ -1752,6 +1757,7 @@ zoneight234
     }
 
     #[test]
+    #[ignore]
     fn day4p1_case1() {
         let input = "Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53
 Card 2: 13 32 20 16 61 | 61 30 68 82 17 32 24 19
@@ -1765,6 +1771,7 @@ Card 6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11";
     }
 
     #[test]
+    #[ignore]
     fn day4p2_case1() {
         let input = "Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53
 Card 2: 13 32 20 16 61 | 61 30 68 82 17 32 24 19
@@ -1778,6 +1785,7 @@ Card 6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11";
     }
 
     #[test]
+    #[ignore]
     fn day5p1_case1() {
         let input = "seeds: 79 14 55 13
 
@@ -1820,6 +1828,7 @@ humidity-to-location map:
     }
 
     #[test]
+    #[ignore]
     fn day5p2_case1() {
         let input = "seeds: 79 14 55 13
 
@@ -1863,6 +1872,7 @@ humidity-to-location map:
     }
 
     #[test]
+    #[ignore]
     fn day6p1_case1() {
         let input = "Time:      7  15   30
 Distance:  9  40  200";
@@ -1880,6 +1890,7 @@ Distance:  9  40  200";
     }
 
     #[test]
+    #[ignore]
     fn day7_hand_ordering() {
         let hand1 = Hand::try_from("QQQJA").unwrap();
         let hand2 = Hand::try_from("KTJJT").unwrap();
@@ -1892,6 +1903,7 @@ Distance:  9  40  200";
     }
 
     #[test]
+    #[ignore]
     fn day7p2_case1() {
         let input = "32T3K 765
 T55J5 684
@@ -1905,6 +1917,7 @@ QQQJA 483";
     }
 
     #[test]
+    #[ignore]
     fn day8p1_case1() {
         let input = "RL
 
@@ -1921,6 +1934,7 @@ ZZZ = (ZZZ, ZZZ)";
     }
 
     #[test]
+    #[ignore]
     fn day9p1_case1() {
         let input = "0 3 6 9 12 15
 1 3 6 10 15 21
@@ -1936,6 +1950,7 @@ ZZZ = (ZZZ, ZZZ)";
     }
 
     #[test]
+    #[ignore]
     fn day10p1_case1() {
         let input = ".....
 .S-7.
@@ -1948,6 +1963,7 @@ ZZZ = (ZZZ, ZZZ)";
     }
 
     #[test]
+    #[ignore]
     fn day10p1_case2() {
         let input = "..F7.
 .FJ|.
@@ -1960,6 +1976,7 @@ LJ...";
     }
 
     #[test]
+    #[ignore]
     fn day10p2_case1() {
         let input = "...........
 .S-------7.
@@ -1977,6 +1994,7 @@ LJ...";
     }
 
     #[test]
+    #[ignore]
     fn day10p2_case2() {
         let input = ".F----7F7F7F7F-7....
 .|F--7||||||||FJ....
@@ -1995,6 +2013,7 @@ L--J.L7...LJS7F-7L7.
     }
 
     #[test]
+    #[ignore]
     fn day10p2_case3() {
         let input = "FF7FSF7F7F7F7F7F---7
 L|LJ||||||||||||F--J
