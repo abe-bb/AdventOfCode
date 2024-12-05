@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::File,
     io::{BufRead, BufReader, Read},
     iter::repeat_n,
@@ -17,9 +17,119 @@ pub fn init() -> Box<dyn AdventYear> {
         Box::new(day2),
         Box::new(day3),
         Box::new(day4),
+        Box::new(day5),
     ];
 
     Box::new(Year { year: 2024, days })
+}
+
+fn day5() {
+    let reader = BufReader::new(File::open("./input/2024/day5").unwrap());
+    let (rules, mut updates) = day5_parse(reader);
+
+    println!("Part 1: {}", day5p1_logic(&rules, &mut updates));
+    day5p2_logic(&rules, &mut updates);
+    println!("Part 2: {}", day5p1_logic(&rules, &mut updates));
+}
+
+fn day5p2_logic(rules: &HashMap<i32, Vec<i32>>, updates: &mut Vec<Vec<i32>>) {
+    let mut i = 0;
+    while i < updates.len() {
+        let mut seen: HashMap<i32, usize> = HashMap::new();
+        let mut broke_rule = false;
+        let mut remove_index: usize = 0;
+        let mut insert_index: usize = 0;
+
+        let update = updates.get_mut(i).unwrap();
+        for j in 0..update.len() {
+            let page = update[j];
+            if let Some(rule) = rules.get(&page) {
+                for p in rule {
+                    if seen.contains_key(p) {
+                        broke_rule = true;
+                        insert_index = *seen.get(p).unwrap();
+                        remove_index = j;
+                        assert!(remove_index > insert_index);
+                        break;
+                    }
+                }
+            }
+
+            if broke_rule {
+                break;
+            }
+
+            seen.insert(page, j);
+        }
+        if broke_rule {
+            let remove = updates[i].remove(remove_index);
+            updates[i].insert(insert_index, remove);
+        } else {
+            i += 1;
+        }
+    }
+}
+
+fn day5p1_logic(rules: &HashMap<i32, Vec<i32>>, updates: &mut Vec<Vec<i32>>) -> i32 {
+    let mut correct: Vec<usize> = Vec::new();
+    let mut middle_sum: i32 = 0;
+    for (index, update) in updates.iter().enumerate() {
+        let mut seen = HashSet::new();
+        let mut broke_rule = false;
+        for page in update {
+            if let Some(rule) = rules.get(page) {
+                for p in rule {
+                    if seen.contains(p) {
+                        broke_rule = true;
+                        break;
+                    }
+                }
+            }
+
+            if broke_rule {
+                break;
+            }
+            seen.insert(*page);
+        }
+        if !broke_rule {
+            middle_sum += update[update.len() / 2];
+            correct.push(index);
+        }
+    }
+
+    for index in correct.into_iter().rev() {
+        updates.remove(index);
+    }
+
+    middle_sum
+}
+
+fn day5_parse(reader: impl BufRead) -> (HashMap<i32, Vec<i32>>, Vec<Vec<i32>>) {
+    let mut rules: HashMap<i32, Vec<i32>> = HashMap::new();
+    let mut updates: Vec<Vec<i32>> = Vec::new();
+
+    let mut read_rule = true;
+    for line in reader.lines().map(|x| x.unwrap()) {
+        if line.len() < 3 {
+            read_rule = false;
+            continue;
+        };
+
+        if read_rule {
+            let mut nums = line.split('|');
+            let left: i32 = nums.next().unwrap().parse().unwrap();
+            let right: i32 = nums.next().unwrap().parse().unwrap();
+            rules
+                .entry(left)
+                .and_modify(|x| x.push(right))
+                .or_insert(vec![right]);
+        } else {
+            let update: Vec<i32> = line.split(',').map(|x| x.parse().unwrap()).collect();
+            updates.push(update);
+        }
+    }
+
+    (rules, updates)
 }
 
 fn day4() {
