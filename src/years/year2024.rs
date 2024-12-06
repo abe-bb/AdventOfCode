@@ -18,9 +18,192 @@ pub fn init() -> Box<dyn AdventYear> {
         Box::new(day3),
         Box::new(day4),
         Box::new(day5),
+        Box::new(day6),
     ];
 
     Box::new(Year { year: 2024, days })
+}
+
+fn day6() {
+    let reader = BufReader::new(File::open("./input/2024/day6").unwrap());
+    let (map, guard) = day6_parse(reader);
+    let mut p1map = map.clone();
+    let mut p1guard = guard.clone();
+    let (count, _) = day6p1(&mut p1map, &mut p1guard);
+    let loops = day6p2(map, guard);
+    println!("\nPart 1: {}", count);
+    println!("Part 2: {}", loops);
+}
+
+fn day6p2(map: Vec<Vec<D6State>>, guard: GuardLocation) -> usize {
+    let mut loop_count: usize = 0;
+    for r in 0..map.len() {
+        println!("\nChecking row: {}", r);
+
+        for c in 0..(map[0].len()) {
+            print!(", {}", c);
+            let mut cmap = map.clone();
+            let mut cguard = guard.clone();
+            cmap[r][c] = D6State::Obstacle;
+
+            let (_count, loops) = day6p1(&mut cmap, &mut cguard);
+            if loops {
+                loop_count += 1;
+            }
+        }
+    }
+
+    loop_count
+}
+
+fn day6p1(map: &mut Vec<Vec<D6State>>, guard: &mut GuardLocation) -> (usize, bool) {
+    let mut position_count: usize = 1;
+    let mut visited: HashSet<GuardLocation> = HashSet::new();
+    loop {
+        if visited.contains(guard) {
+            return (position_count, true);
+        }
+        visited.insert(guard.clone());
+
+        match guard.orientation {
+            D6State::GuardUp => {
+                if guard.row == 0 {
+                    break;
+                }
+                if map[guard.row - 1][guard.col] == D6State::Obstacle {
+                    guard.orientation = D6State::GuardRight;
+                } else if map[guard.row - 1][guard.col] == D6State::Unvisitied {
+                    guard.row -= 1;
+                    map[guard.row][guard.col] = D6State::GuardUp;
+                    position_count += 1;
+                } else {
+                    guard.row -= 1;
+                }
+            }
+            D6State::GuardDown => {
+                if guard.row == map.len() - 1 {
+                    break;
+                }
+                if map[guard.row + 1][guard.col] == D6State::Obstacle {
+                    guard.orientation = D6State::GuardLeft;
+                } else if map[guard.row + 1][guard.col] == D6State::Unvisitied {
+                    guard.row += 1;
+                    map[guard.row][guard.col] = D6State::GuardDown;
+                    position_count += 1;
+                } else {
+                    guard.row += 1;
+                }
+            }
+            D6State::GuardLeft => {
+                if guard.col == 0 {
+                    break;
+                }
+                if map[guard.row][guard.col - 1] == D6State::Obstacle {
+                    guard.orientation = D6State::GuardUp;
+                } else if map[guard.row][guard.col - 1] == D6State::Unvisitied {
+                    guard.col -= 1;
+                    map[guard.row][guard.col] = D6State::GuardLeft;
+                    position_count += 1;
+                } else {
+                    guard.col -= 1;
+                }
+            }
+            D6State::GuardRight => {
+                if guard.col == map[0].len() - 1 {
+                    break;
+                }
+                if map[guard.row][guard.col + 1] == D6State::Obstacle {
+                    guard.orientation = D6State::GuardDown;
+                } else if map[guard.row][guard.col + 1] == D6State::Unvisitied {
+                    guard.col += 1;
+                    map[guard.row][guard.col] = D6State::GuardRight;
+                    position_count += 1;
+                } else {
+                    guard.col += 1;
+                }
+            }
+            _ => panic!("Guard not in position"),
+        }
+    }
+
+    (position_count, false)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct GuardLocation {
+    row: usize,
+    col: usize,
+    orientation: D6State,
+}
+
+impl GuardLocation {
+    fn new(row: usize, col: usize, orientation: D6State) -> GuardLocation {
+        GuardLocation {
+            row,
+            col,
+            orientation,
+        }
+    }
+}
+
+fn day6_parse(reader: impl BufRead) -> (Vec<Vec<D6State>>, GuardLocation) {
+    let mut start = GuardLocation::new(0, 0, D6State::Unvisitied);
+    (
+        reader
+            .lines()
+            .enumerate()
+            .map(|(r, x)| {
+                x.unwrap()
+                    .chars()
+                    .enumerate()
+                    .map(|(col, c)| match c {
+                        '.' => D6State::Unvisitied,
+                        '#' => D6State::Obstacle,
+                        '^' => {
+                            assert!(start.orientation == D6State::Unvisitied);
+                            start.orientation = D6State::GuardUp;
+                            start.row = r;
+                            start.col = col;
+                            D6State::GuardUp
+                        }
+                        'v' => {
+                            assert!(start.orientation == D6State::Unvisitied);
+                            start.orientation = D6State::GuardDown;
+                            start.row = r;
+                            start.col = col;
+                            D6State::GuardDown
+                        }
+                        '<' => {
+                            assert!(start.orientation == D6State::Unvisitied);
+                            start.orientation = D6State::GuardLeft;
+                            start.row = r;
+                            start.col = col;
+                            D6State::GuardLeft
+                        }
+                        '>' => {
+                            assert!(start.orientation == D6State::Unvisitied);
+                            start.orientation = D6State::GuardRight;
+                            start.row = r;
+                            start.col = col;
+                            D6State::GuardRight
+                        }
+                        _ => panic!("unexpected input"),
+                    })
+                    .collect_vec()
+            })
+            .collect_vec(),
+        start,
+    )
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+enum D6State {
+    Obstacle,
+    Unvisitied,
+    GuardUp,
+    GuardDown,
+    GuardLeft,
+    GuardRight,
 }
 
 fn day5() {
